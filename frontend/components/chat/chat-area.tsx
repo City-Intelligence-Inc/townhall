@@ -86,7 +86,85 @@ const mdComponents = {
   ),
 };
 
+function FileCard({ name, size, url }: { name: string; size?: string; url?: string }) {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  const colors: Record<string, string> = {
+    pdf: "bg-red-50 text-red-500 border-red-100",
+    doc: "bg-blue-50 text-blue-500 border-blue-100",
+    docx: "bg-blue-50 text-blue-500 border-blue-100",
+    xls: "bg-green-50 text-green-600 border-green-100",
+    xlsx: "bg-green-50 text-green-600 border-green-100",
+    png: "bg-purple-50 text-purple-500 border-purple-100",
+    jpg: "bg-purple-50 text-purple-500 border-purple-100",
+    jpeg: "bg-purple-50 text-purple-500 border-purple-100",
+    zip: "bg-amber-50 text-amber-600 border-amber-100",
+    csv: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  };
+  const c = colors[ext] || "bg-neutral-50 text-neutral-500 border-neutral-200";
+  return (
+    <div
+      className="inline-flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 mt-1 mb-0.5 hover:border-neutral-300 hover:shadow-sm transition-all cursor-pointer max-w-sm"
+      onClick={() => url ? window.open(url, "_blank") : null}
+    >
+      <div className={`flex h-10 w-10 items-center justify-center rounded-lg border shrink-0 ${c}`}>
+        <FileText className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[13px] font-medium text-neutral-900 truncate">{name}</p>
+        <p className="text-[11px] text-neutral-400">
+          {size || ext.toUpperCase() + " file"}
+          {url ? " · Click to open" : " · Attachment"}
+        </p>
+      </div>
+      {url && (
+        <svg className="h-4 w-4 text-neutral-300 shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
+function parseAttachment(content: string) {
+  // 📎 Shared: **name** (size)
+  let m = content.match(/^📎\s*Shared(?:\s*file)?:\s*\*\*(.+?)\*\*\s*\((.+?)\)\s*$/);
+  if (m) return { fileName: m[1], fileSize: m[2] };
+  // 📎 [name](url)
+  m = content.match(/^📎\s*\[(.+?)\]\((.+?)\)\s*$/);
+  if (m) return { fileName: m[1], fileUrl: m[2] };
+  // ![name](url)
+  m = content.match(/^!\[(.+?)\]\((.+?)\)\s*$/);
+  if (m) return { fileName: m[1], fileUrl: m[2], isImage: true };
+  // **📎 name**\n\ncontent (text file paste)
+  m = content.match(/^\*\*📎\s*(.+?)\*\*\n\n([\s\S]*)$/);
+  if (m) return { fileName: m[1], textContent: m[2] };
+  return null;
+}
+
 function MessageContent({ content }: { content: string }) {
+  const attach = parseAttachment(content);
+  if (attach) {
+    if (attach.isImage && attach.fileUrl) {
+      return (
+        <div className="mt-1">
+          <img src={attach.fileUrl} alt={attach.fileName} className="max-w-sm max-h-[300px] rounded-lg border border-neutral-200" />
+          <p className="text-[11px] text-neutral-400 mt-1">{attach.fileName}</p>
+        </div>
+      );
+    }
+    if (attach.textContent) {
+      return (
+        <div>
+          <FileCard name={attach.fileName!} size={`${(attach.textContent.length / 1024).toFixed(1)} KB`} />
+          <pre className="mt-2 text-[12px] text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 max-h-[200px] overflow-auto font-mono leading-relaxed whitespace-pre-wrap">
+            {attach.textContent.slice(0, 2000)}{attach.textContent.length > 2000 ? "\n…" : ""}
+          </pre>
+        </div>
+      );
+    }
+    return <FileCard name={attach.fileName!} size={attach.fileSize} url={attach.fileUrl} />;
+  }
+
   const hasMarkdown = /[*_`#\[\]>~-]/.test(content);
   if (!hasMarkdown) return <span className="whitespace-pre-wrap">{content}</span>;
   return (
