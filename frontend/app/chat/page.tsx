@@ -180,12 +180,15 @@ export default function ChatPage() {
           api.getActiveUsers(activeRoomId!),
         ]);
 
-        // Build set of online user IDs from connections
+        // Build set of online user IDs — only count connections from last 60s as alive
         const onlineSet = new Set<string>();
+        const now = Date.now();
         for (const c of activeConns) {
-          onlineSet.add(c.userId || c.user_id);
+          const connTime = new Date(c.connectedAt || c.connected_at).getTime();
+          if (now - connTime < 60000) { // 60s staleness threshold
+            onlineSet.add(c.userId || c.user_id);
+          }
         }
-        // Current user is always online
         onlineSet.add(user!.id);
 
         // Build user map from members
@@ -247,8 +250,12 @@ export default function ChatPage() {
           api.getActiveUsers(activeRoomId!),
         ]);
         const onlineSet = new Set<string>();
+        const now = Date.now();
         for (const c of activeConns) {
-          onlineSet.add(c.userId || c.user_id);
+          const connTime = new Date(c.connectedAt || c.connected_at).getTime();
+          if (now - connTime < 60000) {
+            onlineSet.add(c.userId || c.user_id);
+          }
         }
         onlineSet.add(user!.id);
 

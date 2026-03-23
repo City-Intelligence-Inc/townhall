@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Hash, Users, SendHorizontal, Paperclip, Trash2, Pencil, Reply, X, SmilePlus, Check, Menu } from "lucide-react";
+import { Hash, Users, SendHorizontal, Paperclip, Trash2, Pencil, Reply, X, SmilePlus, Check, Menu, FileText, Image as ImageIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
