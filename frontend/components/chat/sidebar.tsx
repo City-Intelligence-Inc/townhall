@@ -21,6 +21,7 @@ interface SidebarProps {
   activeRoomId: string | null;
   onSelectRoom: (roomId: string) => void;
   onCreateRoom: (name: string, description: string) => void;
+  onOpenSearch?: () => void;
 }
 
 interface SearchResult {
@@ -31,7 +32,7 @@ interface SearchResult {
   created_at: string;
 }
 
-export function Sidebar({ rooms, activeRoomId, onSelectRoom, onCreateRoom }: SidebarProps) {
+export function Sidebar({ rooms, activeRoomId, onSelectRoom, onCreateRoom, onOpenSearch }: SidebarProps) {
   const { user } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");

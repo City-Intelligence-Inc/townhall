@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Hash, Users, SendHorizontal, Smile, Paperclip, Trash2, X, FileText, Image as ImageIcon } from "lucide-react";
+import { Hash, Users, SendHorizontal, Smile, Paperclip, Trash2, X, FileText, Image as ImageIcon, MessageSquare, Share, Bookmark, MoreHorizontal, Copy, Pin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
@@ -24,11 +24,16 @@ interface ChatAreaProps {
   messages: Message[];
   onSendMessage: (content: string) => void;
   onDeleteMessage?: (messageId: string, sortKey?: string) => void;
+  onEditMessage?: (messageId: string, sortKey: string, newContent: string) => void;
+  onToggleReaction?: (messageId: string, sortKey: string, emoji: string) => void;
   onToggleMembers: () => void;
   showMembers: boolean;
   typingUsers?: string[];
   onTyping?: () => void;
   currentUserId?: string;
+  replyingTo?: Message | null;
+  onReply?: (msg: Message) => void;
+  onCancelReply?: () => void;
 }
 
 function formatTime(iso: string) {
@@ -84,34 +89,200 @@ function MessageContent({ content }: { content: string }) {
   );
 }
 
+// Slack-style hover action bar
+function MessageActionBar({
+  isOwn,
+  onDelete,
+  onReply,
+  content,
+}: {
+  isOwn: boolean;
+  onDelete?: () => void;
+  onReply?: () => void;
+  content: string;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [moreOpen]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => { setCopied(false); setMoreOpen(false); }, 1200);
+  };
+
+  const actionBtn =
+    "h-7 w-7 flex items-center justify-center rounded transition-colors text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100";
+
+  return (
+    <div className="absolute -top-4 right-4 hidden group-hover:flex items-center bg-white rounded-lg border border-neutral-200 shadow-sm z-10">
+      {/* Quick emoji reactions */}
+      <button className={actionBtn} title="React">
+        <Smile className="h-4 w-4" />
+      </button>
+      {/* Reply / thread */}
+      <button className={actionBtn} title="Reply in thread" onClick={onReply}>
+        <MessageSquare className="h-4 w-4" />
+      </button>
+      {/* Share */}
+      <button className={actionBtn} title="Share message">
+        <Share className="h-4 w-4" />
+      </button>
+      {/* Bookmark */}
+      <button className={actionBtn} title="Save for later">
+        <Bookmark className="h-4 w-4" />
+      </button>
+      {/* More — opens dropdown with copy, pin, delete */}
+      <div className="relative" ref={menuRef}>
+        <button
+          className={`${actionBtn} ${moreOpen ? "bg-neutral-100 text-neutral-800" : ""}`}
+          title="More actions"
+          onClick={() => setMoreOpen((s) => !s)}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+        {moreOpen && (
+          <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-neutral-200 bg-white shadow-lg py-1 z-20">
+            <button
+              onClick={handleCopy}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-neutral-700 hover:bg-neutral-50 transition-colors"
+            >
+              <Copy className="h-3.5 w-3.5 text-neutral-400" />
+              {copied ? "Copied!" : "Copy text"}
+            </button>
+            <button
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-neutral-700 hover:bg-neutral-50 transition-colors"
+            >
+              <Pin className="h-3.5 w-3.5 text-neutral-400" />
+              Pin to channel
+            </button>
+            {isOwn && onDelete && (
+              <>
+                <div className="my-1 border-t border-neutral-100" />
+                <button
+                  onClick={() => { onDelete(); setMoreOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete message
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ChatArea({
   roomName,
   roomDescription,
   messages,
   onSendMessage,
   onDeleteMessage,
+  onEditMessage,
+  onToggleReaction,
   onToggleMembers,
   showMembers,
   typingUsers = [],
   onTyping,
   currentUserId,
+  replyingTo,
+  onReply,
+  onCancelReply,
 }: ChatAreaProps) {
   const { user } = useUser();
   const [input, setInput] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<{ file: File; preview?: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    onSendMessage(input.trim());
-    setInput("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
-  };
+  // Upload file to S3 via backend
+  const uploadFile = useCallback(async (file: File): Promise<{ url: string; key: string; name: string } | null> => {
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API}/api/uploads/`, { method: "POST", body: formData });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return { url: data.url, key: data.key, name: file.name };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const processFiles = useCallback(async (files: File[]) => {
+    // Add previews for images
+    const withPreviews = files.map((file) => {
+      if (file.type.startsWith("image/")) {
+        return { file, preview: URL.createObjectURL(file) };
+      }
+      return { file };
+    });
+    setPendingFiles((prev) => [...prev, ...withPreviews]);
+  }, []);
+
+  const removePendingFile = useCallback((index: number) => {
+    setPendingFiles((prev) => {
+      const removed = prev[index];
+      if (removed?.preview) URL.revokeObjectURL(removed.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
+
+  const handleSend = useCallback(async () => {
+    const hasText = input.trim();
+    const hasFiles = pendingFiles.length > 0;
+    if (!hasText && !hasFiles) return;
+
+    // Upload pending files first
+    if (hasFiles) {
+      setUploading(true);
+      for (const { file } of pendingFiles) {
+        const result = await uploadFile(file);
+        if (result) {
+          const isImage = file.type.startsWith("image/");
+          const fileMsg = isImage
+            ? `![${result.name}](${result.url})`
+            : `[${result.name}](${result.url})`;
+          onSendMessage(fileMsg);
+        }
+      }
+      // Clean up previews
+      pendingFiles.forEach((pf) => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
+      setPendingFiles([]);
+      setUploading(false);
+    }
+
+    // Send text message if any
+    if (hasText) {
+      onSendMessage(input.trim());
+      setInput("");
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+    }
+  }, [input, pendingFiles, uploadFile, onSendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -125,29 +296,47 @@ export function ChatArea({
     const el = e.target;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 150) + "px";
-    // Fire typing indicator
     if (e.target.value.trim() && onTyping) onTyping();
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = reader.result as string;
-      if (file.name.endsWith(".md") || file.name.endsWith(".txt") || file.name.endsWith(".markdown")) {
-        // Paste markdown/text content directly into the input
-        setInput((prev) => prev ? prev + "\n" + text : text);
-      } else {
-        // For other files, send as a message with the filename
-        setInput((prev) => prev ? prev + "\n📎 " + file.name : "📎 " + file.name);
-      }
-      // Reset file input
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      textareaRef.current?.focus();
-    };
-    reader.readAsText(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) processFiles(files);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) processFiles(files);
+  }, [processFiles]);
 
   // Toolbar helpers
   const wrapSelection = (before: string, after: string) => {
@@ -179,7 +368,24 @@ export function ChatArea({
   }
 
   return (
-    <div className="flex flex-col flex-1 min-w-0 bg-white">
+    <div
+      className="flex flex-col flex-1 min-w-0 bg-white relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-blue-400 rounded-lg m-2 pointer-events-none">
+          <div className="text-center">
+            <Paperclip className="h-10 w-10 text-blue-400 mx-auto mb-3" />
+            <p className="text-lg font-semibold text-neutral-700">Drop files here</p>
+            <p className="text-sm text-neutral-400 mt-1">Images, documents, or any file</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-5 h-12 border-b border-neutral-200 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -248,16 +454,11 @@ export function ChatArea({
                       <div className="pl-[56px] text-[15px] text-neutral-800 leading-[1.7]">
                         <MessageContent content={msg.content} />
                       </div>
-                      {/* Delete button */}
-                      {isOwn && onDeleteMessage && (
-                        <button
-                          onClick={() => onDeleteMessage(msg.id, msg.sort_key)}
-                          className="absolute right-5 top-1/2 -translate-y-1/2 hidden group-hover:flex h-7 w-7 items-center justify-center rounded-md bg-white border border-neutral-200 text-neutral-400 hover:text-red-500 hover:border-red-200 shadow-sm transition-colors"
-                          title="Delete message"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      )}
+                      <MessageActionBar
+                        isOwn={isOwn}
+                        content={msg.content}
+                        onDelete={onDeleteMessage ? () => onDeleteMessage(msg.id, msg.sort_key) : undefined}
+                      />
                     </div>
                   );
                 }
@@ -283,16 +484,11 @@ export function ChatArea({
                         <MessageContent content={msg.content} />
                       </div>
                     </div>
-                    {/* Delete button */}
-                    {isOwn && onDeleteMessage && (
-                      <button
-                        onClick={() => onDeleteMessage(msg.id, msg.sort_key)}
-                        className="absolute right-5 top-3 hidden group-hover:flex h-7 w-7 items-center justify-center rounded-md bg-white border border-neutral-200 text-neutral-400 hover:text-red-500 hover:border-red-200 shadow-sm transition-colors"
-                        title="Delete message"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
+                    <MessageActionBar
+                      isOwn={isOwn}
+                      content={msg.content}
+                      onDelete={onDeleteMessage ? () => onDeleteMessage(msg.id, msg.sort_key) : undefined}
+                    />
                   </div>
                 );
               })}
@@ -309,6 +505,37 @@ export function ChatArea({
             <span className="font-medium text-neutral-500">{typingUsers.join(", ")}</span>
             {typingUsers.length === 1 ? " is" : " are"} typing...
           </p>
+        </div>
+      )}
+
+      {/* Pending file previews */}
+      {pendingFiles.length > 0 && (
+        <div className="px-4 pt-2 shrink-0">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 overflow-x-auto pb-1">
+            {pendingFiles.map((pf, i) => (
+              <div key={i} className="relative group shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 overflow-hidden">
+                {pf.preview ? (
+                  <img src={pf.preview} alt={pf.file.name} className="h-20 w-20 object-cover" />
+                ) : (
+                  <div className="h-20 w-20 flex flex-col items-center justify-center gap-1 px-1">
+                    <FileText className="h-6 w-6 text-neutral-400" />
+                    <span className="text-[10px] text-neutral-500 truncate max-w-[72px] text-center">{pf.file.name}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => removePendingFile(i)}
+                  className="absolute top-1 right-1 h-5 w-5 rounded-full bg-neutral-900/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+            {uploading && (
+              <div className="h-20 w-20 shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 flex items-center justify-center">
+                <div className="h-5 w-5 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -349,13 +576,14 @@ export function ChatArea({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".md,.txt,.markdown,.json,.csv,.log"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt,.md,.csv,.json,.log,.zip"
                 onChange={handleFileSelect}
                 className="hidden"
               />
               <button
                 type="button"
-                title="Attach file (.md, .txt)"
+                title="Attach file (drag & drop also works)"
                 onClick={() => fileInputRef.current?.click()}
                 className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors"
               >
@@ -367,13 +595,13 @@ export function ChatArea({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-neutral-300">
-                {input.trim() ? "Enter to send" : ""}
+                {(input.trim() || pendingFiles.length > 0) ? "Enter to send" : ""}
               </span>
               <button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!input.trim() && pendingFiles.length === 0}
                 className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-150 ${
-                  input.trim()
+                  (input.trim() || pendingFiles.length > 0)
                     ? "bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm"
                     : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
                 }`}

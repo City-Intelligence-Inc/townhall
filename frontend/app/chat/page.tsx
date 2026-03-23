@@ -573,9 +573,9 @@ export default function ChatPage() {
       )}
       {searchOpen && (
         <SearchModal
+          open={searchOpen}
           onClose={() => setSearchOpen(false)}
           onNavigate={(roomId: string) => { setActiveRoomId(roomId); setSearchOpen(false); }}
-          activeRoomId={activeRoomId}
           rooms={rooms}
         />
       )}
