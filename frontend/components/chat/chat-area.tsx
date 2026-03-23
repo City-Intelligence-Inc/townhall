@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Hash, Users, SendHorizontal, Paperclip, Trash2, Pencil, Reply, X, SmilePlus, Check } from "lucide-react";
+import { Hash, Users, SendHorizontal, Paperclip, Trash2, Pencil, Reply, X, SmilePlus, Check, FileText, Image as ImageIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -147,6 +147,7 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
   const [editContent, setEditContent] = useState("");
   const [emojiPickerMsgId, setEmojiPickerMsgId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [pendingFile, setPendingFile] = useState<{ name: string; size: number; type: string; content?: string; isText: boolean } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +157,15 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
   useEffect(() => { if (replyingTo) textareaRef.current?.focus(); }, [replyingTo]);
 
   const handleSend = () => {
+    if (pendingFile) {
+      sendPendingFile();
+      if (input.trim()) {
+        onSendMessage(input.trim());
+        setInput("");
+      }
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      return;
+    }
     if (!input.trim()) return;
     onSendMessage(input.trim());
     setInput("");
@@ -192,43 +202,50 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
     setTimeout(() => { ta.focus(); ta.selectionStart = start + before.length; ta.selectionEnd = end + before.length; }, 0);
   };
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    for (const file of files) {
-      const isTextFile = file.type.startsWith("text/") ||
-        file.name.match(/\.(md|txt|markdown|json|csv|log|xml|yaml|yml|toml|sh|py|js|ts|jsx|tsx|html|css|sql)$/i);
+  const isTextFile = (file: File) =>
+    file.type.startsWith("text/") ||
+    !!file.name.match(/\.(md|txt|markdown|json|csv|log|xml|yaml|yml|toml|sh|py|js|ts|jsx|tsx|html|css|sql)$/i);
 
-      if (isTextFile) {
-        // Read text content and paste into input
-        const reader = new FileReader();
-        reader.onload = () => {
-          const text = reader.result as string;
-          const header = `**📎 ${file.name}**\n\n`;
-          setInput((prev) => prev ? prev + "\n" + header + text : header + text);
-          textareaRef.current?.focus();
-        };
-        reader.readAsText(file);
-      } else {
-        // Binary file — try upload endpoint, fallback to file info message
-        try {
-          const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-          const formData = new FormData();
-          formData.append("file", file);
-          const res = await fetch(`${API}/api/uploads/`, { method: "POST", body: formData });
-          if (res.ok) {
-            const data = await res.json();
-            const isImage = file.type.startsWith("image/");
-            onSendMessage(isImage ? `![${file.name}](${data.url})` : `📎 [${file.name}](${data.url})`);
-          } else {
-            onSendMessage(`📎 Shared file: **${file.name}** (${(file.size / 1024).toFixed(1)} KB)`);
-          }
-        } catch {
-          onSendMessage(`📎 Shared file: **${file.name}** (${(file.size / 1024).toFixed(1)} KB)`);
-        }
-      }
+  const stageFile = useCallback((file: File) => {
+    if (isTextFile(file)) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = reader.result as string;
+        // Only preview first 500 chars
+        setPendingFile({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: text,
+          isText: true,
+        });
+      };
+      reader.readAsText(file);
+    } else {
+      setPendingFile({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        isText: false,
+      });
     }
+  }, []);
+
+  const sendPendingFile = useCallback(() => {
+    if (!pendingFile) return;
+    if (pendingFile.isText && pendingFile.content) {
+      onSendMessage(`**📎 ${pendingFile.name}**\n\n${pendingFile.content}`);
+    } else {
+      onSendMessage(`📎 Shared: **${pendingFile.name}** (${(pendingFile.size / 1024).toFixed(1)} KB)`);
+    }
+    setPendingFile(null);
+  }, [pendingFile, onSendMessage]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) stageFile(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [onSendMessage]);
+  }, [stageFile]);
 
   // Drag and drop handlers
   const handleDragEnter = (e: React.DragEvent) => {
@@ -254,52 +271,14 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
     e.stopPropagation();
   };
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current = 0;
     setIsDragging(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-
-    for (const file of files) {
-      // Only read plaintext files — NOT PDFs or other binary formats
-      const isTextFile = (
-        file.type.startsWith("text/") ||
-        file.name.match(/\.(md|txt|markdown|json|csv|log|xml|yaml|yml|toml|ini|env|sh|py|js|ts|jsx|tsx|html|css|sql)$/i)
-      );
-
-      if (isTextFile) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const text = reader.result as string;
-          const header = `**📎 ${file.name}**\n\n`;
-          setInput((prev) => prev ? prev + "\n" + header + text : header + text);
-          textareaRef.current?.focus();
-        };
-        reader.readAsText(file);
-      } else {
-        // For binary files (images etc.), try the upload endpoint
-        try {
-          const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-          const formData = new FormData();
-          formData.append("file", file);
-          const res = await fetch(`${API}/api/uploads/`, { method: "POST", body: formData });
-          if (res.ok) {
-            const data = await res.json();
-            const isImage = file.type.startsWith("image/");
-            onSendMessage(isImage ? `![${file.name}](${data.url})` : `📎 [${file.name}](${data.url})`);
-          } else {
-            // Fallback: just mention the file name
-            onSendMessage(`📎 Shared file: **${file.name}** (${(file.size / 1024).toFixed(1)} KB)`);
-          }
-        } catch {
-          onSendMessage(`📎 Shared file: **${file.name}** (${(file.size / 1024).toFixed(1)} KB)`);
-        }
-      }
-    }
-  }, [onSendMessage]);
+    const file = e.dataTransfer.files[0];
+    if (file) stageFile(file);
+  }, [stageFile]);
 
   const groups: { label: string; msgs: Message[] }[] = [];
   let curDate = "";
@@ -487,6 +466,42 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
       )}
 
       <div className={`px-4 pb-4 ${replyingTo ? "pt-0" : "pt-1"} shrink-0`}>
+        {/* File attachment preview */}
+        {pendingFile && (
+          <div className="max-w-3xl mx-auto mb-2">
+            <div className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-neutral-200 shrink-0">
+                {pendingFile.type.startsWith("image/") ? (
+                  <ImageIcon className="h-5 w-5 text-blue-500" />
+                ) : (
+                  <FileText className="h-5 w-5 text-neutral-500" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-neutral-900 truncate">{pendingFile.name}</p>
+                <p className="text-[11px] text-neutral-400">
+                  {(pendingFile.size / 1024).toFixed(1)} KB
+                  {pendingFile.isText && pendingFile.content && (
+                    <> &middot; {pendingFile.content.split("\n").length} lines</>
+                  )}
+                  {pendingFile.isText ? " — content will be shared as message" : " — file info will be shared"}
+                </p>
+                {pendingFile.isText && pendingFile.content && (
+                  <pre className="mt-1.5 text-[11px] text-neutral-500 bg-white border border-neutral-200 rounded px-2 py-1.5 max-h-[60px] overflow-hidden font-mono leading-tight">
+                    {pendingFile.content.slice(0, 200)}{pendingFile.content.length > 200 ? "..." : ""}
+                  </pre>
+                )}
+              </div>
+              <button
+                onClick={() => setPendingFile(null)}
+                className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                title="Remove attachment"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
         <div className={`max-w-3xl mx-auto ${replyingTo ? "rounded-b-xl rounded-t-none" : "rounded-xl"} border border-neutral-200 bg-neutral-50/80 shadow-sm focus-within:border-neutral-300 focus-within:bg-white focus-within:shadow-md transition-all duration-200`}>
           <div className="flex items-center gap-0.5 px-3 pt-2.5 pb-1">
             <button type="button" title="Bold" onClick={() => wrapSelection("**", "**")} className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors text-xs font-bold">B</button>
@@ -507,7 +522,7 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-neutral-300">{input.trim() ? "Enter to send" : ""}</span>
-              <button onClick={handleSend} disabled={!input.trim()} className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-150 ${input.trim() ? "bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm" : "bg-neutral-200 text-neutral-400 cursor-not-allowed"}`}><SendHorizontal className="h-4 w-4" /></button>
+              <button onClick={handleSend} disabled={!input.trim() && !pendingFile} className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-150 ${(input.trim() || pendingFile) ? "bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm" : "bg-neutral-200 text-neutral-400 cursor-not-allowed"}`}><SendHorizontal className="h-4 w-4" /></button>
             </div>
           </div>
         </div>

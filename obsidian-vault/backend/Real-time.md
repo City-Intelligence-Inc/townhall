@@ -71,8 +71,25 @@ sse.addEventListener("new_message", (event) => {
 | Event | Data | When |
 |-------|------|------|
 | `connected` | `{ room_id, timestamp }` | On subscribe |
-| `new_message` | Full message object | Message sent (REST or WS) |
+| `new_message` | Full message object (incl. reactions, replyTo) | Message sent |
+| `message_deleted` | `{ roomId, sortKey }` | Message deleted |
+| `message_edited` | Full updated message object | Message edited |
+| `typing` | `{ user_id, username, typers }` | User starts typing (5s expiry) |
+| `stop_typing` | `{ user_id }` | User stops typing |
+| `reaction_update` | `{ sortKey, messageId, reactions }` | Reaction toggled |
+| `member_kicked` | `{ userId }` | Admin kicks a member |
+| `member_muted` | `{ userId, mutedUntil }` | Admin mutes a member |
+| `member_banned` | `{ userId }` | Admin bans a member |
 | `user_left` | `{ userId, timestamp }` | WS disconnect |
+
+### Typing Indicators (SSE)
+
+```
+POST /api/sse/{room_id}/typing   → { user_id, username }
+POST /api/sse/{room_id}/stop_typing → { user_id, username }
+```
+
+The frontend sends typing on keypress, then auto-sends stop_typing after 3s of inactivity. The backend tracks typing state in-memory with 5s expiry and broadcasts to all subscribers.
 
 ## WebSocket (Local Dev)
 

@@ -116,6 +116,44 @@ Discord's design is proven for chat apps:
 
 This matches users' mental model from Discord/Slack. The right panel is toggleable to give more space on small screens.
 
+## Why Emoji Reactions as a Map on Message Items?
+
+```json
+"reactions": { "👍": ["user1", "user2"], "❤️": ["user3"] }
+```
+
+**Option A** (what we do): Store reactions as a map attribute directly on the message item in DynamoDB.
+**Option B**: Separate reactions table with (messageId, emoji, userId) as key.
+
+We chose A because:
+- No extra table or index needed
+- Single read to get message + reactions
+- Toggle is a read-modify-write (acceptable at chat scale)
+- DynamoDB item limit is 400KB — plenty for reaction data
+
+**When to switch to Option B**: High-volume reactions where read-modify-write creates contention.
+
+## Why SSE Typing Indicators over Polling?
+
+Typing indicators need sub-second delivery. Options:
+- **Polling**: 1s interval = too much traffic, 5s = too slow
+- **SSE events**: Instant delivery, zero extra connections (reuses existing SSE stream)
+- **WebSocket**: Best but not available on App Runner
+
+SSE typing events with 5s server-side expiry and 3s client-side debounce gives a good UX:
+- Start typing → immediate broadcast
+- Stop typing → 3s debounce then explicit stop
+- Server auto-expires after 5s as safety net
+
+## Why Reply-to as Message Metadata (not Threading)?
+
+Full threading (like Slack threads) needs:
+- Separate thread views
+- Thread participant tracking
+- Notification preferences per thread
+
+Instead, we store `replyTo` (parent sortKey) and `replyPreview` (first 100 chars) directly on the message. This gives Discord-style quoted replies without the complexity of thread management. The preview is denormalized to avoid an extra read when rendering.
+
 ## Related
 - [[interview/Talking Points]]
 - [[interview/Hot Partition Problem]]

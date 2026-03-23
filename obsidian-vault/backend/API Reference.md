@@ -38,7 +38,7 @@ See: [[data-model/Chat Rooms Table]]
 
 > POST auto-joins creator as admin in room_members.
 
-## Members (5 endpoints)
+## Members (9 endpoints)
 
 See: [[data-model/Room Members Table]]
 
@@ -48,21 +48,28 @@ See: [[data-model/Room Members Table]]
 | GET | `/api/members/user/{user_id}` | — | `{ memberships: [...] }` |
 | POST | `/api/members/{room_id}/join` | `{ user_id }` | `{ member: {...} }` |
 | DELETE | `/api/members/{room_id}/leave/{user_id}` | — | `{ message }` |
+| PATCH | `/api/members/{room_id}/read/{user_id}` | — | `{ lastReadAt }` — mark room as read |
+| GET | `/api/members/{room_id}/read/{user_id}` | — | `{ lastReadAt }` — get last read timestamp |
 | DELETE | `/api/members/{room_id}/kick/{user_id}` | query: `admin_user_id` | `{ message }` |
+| POST | `/api/members/{room_id}/mute/{user_id}` | `{ admin_user_id, duration_minutes? }` | `{ mutedUntil }` |
+| POST | `/api/members/{room_id}/unmute/{user_id}` | query: `admin_user_id` | `{ message }` |
+| POST | `/api/members/{room_id}/ban/{user_id}` | query: `admin_user_id` | `{ message }` |
 
-## Messages (5 endpoints)
+## Messages (6 endpoints)
 
 See: [[data-model/Messages Table]]
 
 | Method | Path | Body / Params | Returns |
 |--------|------|---------------|---------|
 | GET | `/api/messages/{room_id}` | `?limit=50&cursor=...` | `{ messages, cursor, has_more }` |
-| POST | `/api/messages/{room_id}` | `{ sender_id, content, sender_name?, type? }` | `{ message: {...} }` |
-| PUT | `/api/messages/{room_id}/{sort_key}` | `{ content }` | `{ message: {...} }` |
-| DELETE | `/api/messages/{room_id}/{sort_key}` | — | `{ message: "deleted" }` |
+| POST | `/api/messages/{room_id}` | `{ sender_id, content, sender_name?, type?, reply_to?, reply_preview? }` | `{ message: {...} }` |
+| PUT | `/api/messages/{room_id}/{sort_key}` | `{ content }` | `{ message: {...} }` — broadcasts `message_edited` via SSE |
+| DELETE | `/api/messages/{room_id}/{sort_key}` | — | `{ message: "deleted" }` — broadcasts `message_deleted` via SSE |
+| POST | `/api/messages/{room_id}/{sort_key}/reactions` | `{ user_id, emoji }` | `{ reactions: {...} }` — toggle reaction, broadcasts `reaction_update` via SSE |
 | GET | `/api/messages/by-sender/{sender_id}` | `?limit=50` | `{ messages: [...] }` |
 
 > POST also publishes to SSE subscribers. See [[backend/Real-time]].
+> Messages now include `reactions` (map of emoji→user_id[]), `replyTo`, `replyPreview` fields.
 
 ## Connections (4 endpoints)
 
@@ -74,6 +81,16 @@ See: [[data-model/Connections Table]]
 | GET | `/api/connections/user/{user_id}` | — | `{ connections: [...] }` |
 | POST | `/api/connections/` | `{ user_id, room_id }` | `{ connection: {...} }` |
 | DELETE | `/api/connections/{conn_id}` | — | `{ message }` |
+
+## Uploads (2 endpoints)
+
+| Method | Path | Body | Returns |
+|--------|------|------|---------|
+| POST | `/api/uploads/` | Multipart file | `{ key, url }` (presigned S3 URL) |
+| GET | `/api/uploads/{key}` | — | `{ key, url }` (presigned download URL) |
+
+> Files uploaded to S3 bucket `chatroom-dev-uploads`. Presigned URLs expire in 1 hour.
+> Frontend sends images as `![name](url)` and files as `[name](url)` in message content.
 
 ## Real-time (2 endpoints)
 

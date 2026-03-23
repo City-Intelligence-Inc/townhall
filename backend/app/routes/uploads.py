@@ -9,7 +9,12 @@ router = APIRouter(prefix="/api/uploads", tags=["Uploads"])
 _region = os.getenv("AWS_REGION", "us-west-2")
 _bucket = os.getenv("S3_UPLOADS_BUCKET", "chatroom-dev-uploads")
 
-s3 = boto3.client("s3", region_name=_region)
+s3 = boto3.client(
+    "s3",
+    region_name=_region,
+    endpoint_url=f"https://s3.{_region}.amazonaws.com",
+    config=boto3.session.Config(s3={"addressing_style": "virtual"}),
+)
 
 
 # ─── POST /api/uploads ── Upload a file to S3 ────────────────────────────────

@@ -50,9 +50,11 @@ The backend returns DynamoDB-style camelCase. The API client maps to frontend co
 ### Messages
 | Function | Method | Path |
 |----------|--------|------|
-| `listMessages(roomId, limit?, cursor?)` | GET | `/api/messages/{roomId}` |
-| `sendMessage(roomId, {sender_id, content, sender_name?})` | POST | `/api/messages/{roomId}` |
+| `listMessages(roomId, limit?, cursor?)` | GET | `/api/messages/{roomId}` — returns reactions, editedAt, replyTo fields |
+| `sendMessage(roomId, {sender_id, content, reply_to?, reply_preview?})` | POST | `/api/messages/{roomId}` |
 | `deleteMessage(roomId, sortKey)` | DELETE | `/api/messages/{roomId}/{sortKey}` |
+| `editMessage(roomId, sortKey, content)` | PUT | `/api/messages/{roomId}/{sortKey}` |
+| `toggleReaction(roomId, sortKey, {user_id, emoji})` | POST | `/api/messages/{roomId}/{sortKey}/reactions` |
 
 ### Users
 | Function | Method | Path |
@@ -66,6 +68,23 @@ The backend returns DynamoDB-style camelCase. The API client maps to frontend co
 | `getActiveUsers(roomId)` | GET | `/api/connections/room/{roomId}` |
 | `registerConnection({id, user_id, room_id})` | POST | `/api/connections/` |
 | `removeConnection(id)` | DELETE | `/api/connections/{id}` |
+
+### Read Receipts
+| Function | Method | Path |
+|----------|--------|------|
+| `markRead(roomId, userId)` | PATCH | `/api/members/{roomId}/read/{userId}` |
+| `getReadStatus(roomId, userId)` | GET | `/api/members/{roomId}/read/{userId}` |
+
+### Typing Indicators
+| Function | Method | Path |
+|----------|--------|------|
+| `sendTyping(roomId, {user_id, username})` | POST | `/api/sse/{roomId}/typing` |
+| `sendStopTyping(roomId, {user_id, username})` | POST | `/api/sse/{roomId}/stop_typing` |
+
+### Search
+| Function | Method | Path |
+|----------|--------|------|
+| `searchMessages(query, roomId?)` | GET | `/api/search/?q=...&room_id=...` |
 
 ### Real-time
 | Function | Returns |
