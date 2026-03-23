@@ -45,6 +45,12 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+function formatFullTimestamp(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" }) +
+    " at " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+}
+
 function formatDateLabel(iso: string) {
   const d = new Date(iso);
   const now = new Date();
@@ -421,7 +427,7 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
                   return (
                     <div key={msg.id} className="group relative -mx-5 px-5 py-[5px] hover:bg-neutral-50/80 transition-colors">
                       {renderActions(msg, isOwn)}
-                      <span className="absolute left-5 top-1/2 -translate-y-1/2 hidden group-hover:inline text-[11px] text-neutral-400 tabular-nums">{formatTime(msg.created_at)}</span>
+                      <span title={formatFullTimestamp(msg.created_at)} className="absolute left-5 top-1/2 -translate-y-1/2 hidden group-hover:inline text-[11px] text-neutral-400 tabular-nums cursor-default">{formatTime(msg.created_at)}</span>
                       <div className="pl-[56px]">{renderContent(msg, isOwn)}</div>
                     </div>
                   );
@@ -433,7 +439,7 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
                     <div className="flex items-start gap-4">
                       <Avatar className="h-10 w-10 mt-0.5 shrink-0"><AvatarImage src={msg.avatar_url} /><AvatarFallback className="bg-neutral-200 text-neutral-600 text-sm font-medium">{msg.username?.[0]?.toUpperCase() || "?"}</AvatarFallback></Avatar>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2"><span className="text-[15px] font-bold text-neutral-900 hover:underline cursor-pointer">{msg.username}</span><span className="text-[12px] text-neutral-400 tabular-nums font-normal">{formatTime(msg.created_at)}</span></div>
+                        <div className="flex items-baseline gap-2"><span className="text-[15px] font-bold text-neutral-900 hover:underline cursor-pointer">{msg.username}</span><span title={formatFullTimestamp(msg.created_at)} className="text-[12px] text-neutral-400 tabular-nums font-normal cursor-default hover:underline hover:text-neutral-500">{formatTime(msg.created_at)}</span></div>
                         {renderContent(msg, isOwn)}
                       </div>
                     </div>
