@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Hash, Users, SendHorizontal, Smile, Paperclip, Trash2 } from "lucide-react";
+import { Hash, Users, SendHorizontal, Smile, Paperclip, Trash2, X, FileText, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
@@ -100,6 +100,7 @@ export function ChatArea({
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -126,6 +127,26 @@ export function ChatArea({
     el.style.height = Math.min(el.scrollHeight, 150) + "px";
     // Fire typing indicator
     if (e.target.value.trim() && onTyping) onTyping();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result as string;
+      if (file.name.endsWith(".md") || file.name.endsWith(".txt") || file.name.endsWith(".markdown")) {
+        // Paste markdown/text content directly into the input
+        setInput((prev) => prev ? prev + "\n" + text : text);
+      } else {
+        // For other files, send as a message with the filename
+        setInput((prev) => prev ? prev + "\n📎 " + file.name : "📎 " + file.name);
+      }
+      // Reset file input
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      textareaRef.current?.focus();
+    };
+    reader.readAsText(file);
   };
 
   // Toolbar helpers
@@ -325,7 +346,19 @@ export function ChatArea({
           </div>
           <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
             <div className="flex items-center gap-0.5">
-              <button type="button" title="Attach file" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".md,.txt,.markdown,.json,.csv,.log"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                type="button"
+                title="Attach file (.md, .txt)"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors"
+              >
                 <Paperclip className="h-3.5 w-3.5" />
               </button>
               <button type="button" title="Mention someone" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors text-sm font-medium">
