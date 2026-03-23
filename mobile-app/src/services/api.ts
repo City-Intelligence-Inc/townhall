@@ -87,6 +87,11 @@ export async function syncUser(
 }
 
 // ── Connections (presence) ─────────────────────────────────────
+export async function getActiveUsers(roomId: string): Promise<any[]> {
+  const data = await apiFetch(`/api/connections/room/${roomId}`);
+  return data.connections || data || [];
+}
+
 export async function registerConnection(
   roomId: string,
   userId: string,
@@ -95,6 +100,17 @@ export async function registerConnection(
     method: 'POST',
     body: JSON.stringify({ room_id: roomId, user_id: userId }),
   });
+}
+
+export async function heartbeat(roomId: string, userId: string): Promise<void> {
+  await apiFetch('/api/connections/heartbeat', {
+    method: 'POST',
+    body: JSON.stringify({ room_id: roomId, user_id: userId }),
+  });
+}
+
+export async function removeUserRoomConnection(userId: string, roomId: string): Promise<void> {
+  await apiFetch(`/api/connections/user/${userId}/room/${roomId}`, { method: 'DELETE' });
 }
 
 export async function removeConnection(connectionId: string): Promise<void> {

@@ -153,7 +153,37 @@ await api.sendMessage(activeRoomId, { sender_id: user.id, content });
 // SSE will deliver the "real" message — deduplication prevents double-showing
 ```
 
+## Presence System
+
+### Connection Lifecycle
+
+```
+1. User enters room → POST /api/connections/ (upsert by user+room)
+2. Every 10s → POST /api/connections/heartbeat (refresh lastSeenAt)
+3. User leaves room → DELETE /api/connections/user/{uid}/room/{rid}
+4. Backend queries filter by TTL (60s) — stale connections auto-garbage-collected
+```
+
+### Heartbeat + TTL
+
+Connections have a `lastSeenAt` field. The backend considers connections alive only if `lastSeenAt` is within 60 seconds. Both web and mobile send heartbeats every 10 seconds via `POST /api/connections/heartbeat`.
+
+When querying active users (`GET /api/connections/room/{room_id}`), the backend filters out stale connections and deletes them from DynamoDB (garbage collection on read).
+
+### Real-time Presence Events
+
+Both web and mobile listen for `user_joined`/`user_left` events for instant status updates:
+- **Web**: SSE `user_joined`/`user_left` event listeners
+- **Mobile**: WebSocket messages with `type: "user_joined"` / `type: "user_left"`
+
+Polling every 10s acts as a fallback to catch missed events.
+
+### Cleanup Endpoint
+
+`DELETE /api/connections/user/{user_id}/room/{room_id}` removes all connections for a user in a room by querying the `roomId-index` GSI. This is more reliable than deleting by UUID (which requires knowing the connection ID).
+
 ## Related
 - [[backend/API Reference]]
 - [[frontend/Components]]
+- [[mobile/API Client]]
 - [[interview/Design Decisions]]

@@ -70,41 +70,85 @@ export default function ChatScreen() {
     return () => { cancelled = true; };
   }, [userId]);
 
-  // Load messages + members + WebSocket when active room changes
+  // Load messages + members + WebSocket + presence polling when active room changes
   useEffect(() => {
     if (!activeRoomId || !userId) return;
     let cancelled = false;
-    let connectionId: string | null = null;
 
     (async () => {
       try {
-        const [msgs, mems] = await Promise.all([
+        const [msgs, mems, activeConns] = await Promise.all([
           api.getMessages(activeRoomId),
           api.getMembers(activeRoomId),
+          api.getActiveUsers(activeRoomId),
         ]);
         if (cancelled) return;
         setMessages(msgs);
-        setMembers(mems);
 
-        const conn = await api.registerConnection(activeRoomId, userId);
-        if (!cancelled) connectionId = conn.connection_id;
+        // Enrich members with online status
+        const onlineSet = new Set<string>();
+        for (const c of activeConns) {
+          onlineSet.add(c.userId || c.user_id);
+        }
+        onlineSet.add(userId);
+        setMembers(mems.map((m: Member) => ({
+          ...m,
+          is_online: onlineSet.has(m.user_id),
+        })));
+
+        await api.registerConnection(activeRoomId, userId);
       } catch {
         // fail silently
       }
     })();
 
-    // WebSocket for real-time messages
-    const ws = api.connectWebSocket(activeRoomId, userId, (msg) => {
+    // Poll presence + send heartbeat every 10s (matches web)
+    const presenceInterval = setInterval(async () => {
+      try {
+        api.heartbeat(activeRoomId, userId).catch(() => {});
+        const [mems, activeConns] = await Promise.all([
+          api.getMembers(activeRoomId),
+          api.getActiveUsers(activeRoomId),
+        ]);
+        const onlineSet = new Set<string>();
+        for (const c of activeConns) {
+          onlineSet.add(c.userId || c.user_id);
+        }
+        onlineSet.add(userId);
+        setMembers(mems.map((m: Member) => ({
+          ...m,
+          is_online: onlineSet.has(m.user_id),
+        })));
+      } catch {}
+    }, 10000);
+
+    // WebSocket for real-time messages + presence events
+    const ws = api.connectWebSocket(activeRoomId, userId, (data: any) => {
+      if (data.type === 'user_joined') {
+        const joinedId = data.userId || data.user_id;
+        setMembers((prev) =>
+          prev.map((m) => m.user_id === joinedId ? { ...m, is_online: true } : m)
+        );
+        return;
+      }
+      if (data.type === 'user_left') {
+        const leftId = data.userId || data.user_id;
+        setMembers((prev) =>
+          prev.map((m) => m.user_id === leftId ? { ...m, is_online: false } : m)
+        );
+        return;
+      }
       setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
+        if (prev.some((m) => m.id === data.id)) return prev;
+        return [...prev, data];
       });
     });
 
     return () => {
       cancelled = true;
+      clearInterval(presenceInterval);
       ws.close();
-      if (connectionId) api.removeConnection(connectionId);
+      api.removeUserRoomConnection(userId, activeRoomId).catch(() => {});
     };
   }, [activeRoomId, userId]);
 

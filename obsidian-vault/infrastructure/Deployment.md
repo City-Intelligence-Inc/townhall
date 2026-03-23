@@ -83,6 +83,7 @@ aws apprunner describe-service \
 |-----|-------|
 | `AWS_REGION` | `us-west-2` |
 | `DYNAMODB_PREFIX` | `chatroom-dev` |
+| `S3_UPLOADS_BUCKET` | `chatroom-dev-uploads` |
 | `PORT` | `8000` |
 
 ## Dockerfile

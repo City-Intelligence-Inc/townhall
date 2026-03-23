@@ -57,7 +57,28 @@
 | Single-instance pub/sub | In-memory SSE channels | Redis Pub/Sub at scale |
 | Search is DynamoDB scan | No OpenSearch | Fine for <10k messages |
 
+## Mobile Parity Status
+
+| Feature | Web | Mobile | Notes |
+|---------|-----|--------|-------|
+| Email/password auth | Clerk `<SignUp>`/`<SignIn>` | Custom forms + Clerk hooks | Both work with same Clerk project |
+| Google OAuth | Clerk built-in | `useOAuth('oauth_google')` + Ionicons icon | |
+| Apple OAuth | Clerk built-in | `useOAuth('oauth_apple')` + Ionicons icon | |
+| Auth token injection | `setTokenProvider(getToken)` | `setTokenProvider(getToken)` | Same pattern |
+| User sync to backend | `{ id, username, email, avatar_url }` | `{ id, username, email, avatar_url }` | Now at parity |
+| Room CRUD | Full | Create + list + join | No leave/delete on mobile |
+| Send messages | Optimistic + SSE | Optimistic + WebSocket | |
+| Real-time receive | SSE | WebSocket | Different transport, same result |
+| Message edit/delete | Hover actions | Not yet | |
+| Reactions | Emoji picker | Not yet | |
+| Reply/threading | Reply action | Not yet | |
+| Typing indicators | SSE typing events | Not yet | |
+| Search | Cmd+K modal | Not yet | |
+| File uploads | Paperclip + S3 | Not yet | |
+| Unread badges | Red badge on sidebar | Not yet | |
+
 ## Related
 - [[frontend/Components]]
 - [[backend/API Reference]]
+- [[mobile/Test Plan]]
 - [[interview/Talking Points]]

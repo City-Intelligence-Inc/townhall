@@ -92,14 +92,24 @@ See: [[data-model/Connections Table]]
 > Files uploaded to S3 bucket `chatroom-dev-uploads`. Presigned URLs expire in 1 hour.
 > Frontend sends images as `![name](url)` and files as `[name](url)` in message content.
 
-## Real-time (2 endpoints)
+## Search (1 endpoint)
+
+| Method | Path | Params | Returns |
+|--------|------|--------|---------|
+| GET | `/api/search/` | `?q=...&room_id=...` | `{ results: [...], count }` — scans messages by content |
+
+## Real-time (5 endpoints)
 
 See: [[backend/Real-time]]
 
 | Protocol | Path | Description |
 |----------|------|-------------|
-| SSE | `GET /api/sse/{room_id}` | Subscribe to room events |
-| WebSocket | `WS /ws/{room_id}/{user_id}` | Full-duplex chat |
+| SSE | `GET /api/sse/{room_id}` | Subscribe to room events (new_message, message_edited, message_deleted, typing, stop_typing, reaction_update) |
+| POST | `/api/sse/{room_id}/typing` | `{ user_id, username }` — signal typing, broadcasts to room |
+| POST | `/api/sse/{room_id}/stop_typing` | `{ user_id, username }` — stop typing signal |
+| WebSocket | `WS /ws/{room_id}/{user_id}` | Full-duplex chat (local dev only — App Runner doesn't support WS) |
+
+**Total: 48 endpoints across 9 route modules + health check.**
 
 ## Related
 - [[architecture/Overview]]

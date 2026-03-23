@@ -1,7 +1,8 @@
 # Townhall — Chat Room Application
 
 > Mechanize take-home challenge. Discord/Slack-style real-time chat.
-> Web + Mobile (React Native). Last synced: 2026-03-23
+> Web + Mobile (React Native). Last synced: 2026-03-23 4:45 PM PST
+> **48 API endpoints** | **9 route modules** | **5 DynamoDB tables + S3** | **20 frontend functions**
 
 ## Quick Links
 
@@ -61,6 +62,7 @@
 - [[infrastructure/Deployment]] — Docker + ECR + App Runner
 
 ### Interview
-- [[interview/Talking Points]] — What to say in the call
+- [[interview/Call Script]] — Literal sentences to read out loud on the call
+- [[interview/Talking Points]] — Detailed technical reference with links
 - [[interview/Hot Partition Problem]] — Discord system design deep dive
 - [[interview/Design Decisions]] — Why we chose what we chose
