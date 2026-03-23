@@ -21,6 +21,7 @@ interface SidebarProps {
   userName?: string;
   userAvatar?: string;
   onClose?: () => void;
+  onSignOut?: () => void;
 }
 
 export function Sidebar({
@@ -31,6 +32,7 @@ export function Sidebar({
   userName = 'User',
   userAvatar,
   onClose,
+  onSignOut,
 }: SidebarProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
@@ -141,6 +143,11 @@ export function Sidebar({
             <Text style={styles.statusText}>Active</Text>
           </View>
         </View>
+        {onSignOut && (
+          <TouchableOpacity style={styles.signOutBtn} onPress={onSignOut}>
+            <Ionicons name="log-out-outline" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Create channel modal */}
@@ -320,7 +327,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: 8,
   },
   avatarFallback: {
     backgroundColor: '#e5e5e5',
@@ -467,5 +474,12 @@ const styles = StyleSheet.create({
     fontSize: Fonts.regular,
     fontWeight: '500',
     color: Colors.textOnDark,
+  },
+  signOutBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

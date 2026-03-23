@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Hash, Users, SendHorizontal } from "lucide-react";
+import { Hash, Users, SendHorizontal, Smile, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -155,33 +155,33 @@ export function ChatArea({
 
                   if (compact) {
                     return (
-                      <div key={msg.id} className="group flex items-start pl-[52px] py-0.5 -mx-2 px-2 rounded hover:bg-neutral-50 transition-colors">
-                        <span className="hidden group-hover:inline text-[11px] text-neutral-300 w-[40px] text-right mr-3 pt-0.5 shrink-0 tabular-nums">
+                      <div key={msg.id} className="group relative -mx-5 px-5 py-[3px] hover:bg-neutral-50/80 transition-colors">
+                        <span className="absolute left-5 top-1/2 -translate-y-1/2 hidden group-hover:inline text-[11px] text-neutral-400 tabular-nums">
                           {formatTime(msg.created_at)}
                         </span>
-                        <p className="text-[14px] text-neutral-800 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                        <p className="pl-[52px] text-[15px] text-neutral-800 leading-[1.65] whitespace-pre-wrap">{msg.content}</p>
                       </div>
                     );
                   }
 
                   return (
-                    <div key={msg.id} className="group flex items-start gap-3 py-2 -mx-2 px-2 rounded hover:bg-neutral-50 transition-colors">
-                      <Avatar className="h-9 w-9 mt-0.5 shrink-0">
+                    <div key={msg.id} className="group relative flex items-start gap-3 -mx-5 px-5 pt-2 pb-1 mt-3 first:mt-0 hover:bg-neutral-50/80 transition-colors">
+                      <Avatar className="h-10 w-10 mt-0.5 shrink-0">
                         <AvatarImage src={msg.avatar_url} />
-                        <AvatarFallback className="bg-neutral-200 text-neutral-600 text-xs font-medium">
+                        <AvatarFallback className="bg-neutral-200 text-neutral-600 text-sm font-medium">
                           {msg.username?.[0]?.toUpperCase() || "?"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline gap-2">
-                          <span className="text-[14px] font-semibold text-neutral-900 hover:underline cursor-pointer">
+                          <span className="text-[15px] font-bold text-neutral-900 hover:underline cursor-pointer">
                             {msg.username}
                           </span>
-                          <span className="text-[11px] text-neutral-400 tabular-nums">
+                          <span className="text-[12px] text-neutral-400 tabular-nums font-normal">
                             {formatTime(msg.created_at)}
                           </span>
                         </div>
-                        <p className="text-[14px] text-neutral-800 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                        <p className="text-[15px] text-neutral-800 leading-[1.65] whitespace-pre-wrap mt-0.5">{msg.content}</p>
                       </div>
                     </div>
                   );
@@ -203,9 +203,29 @@ export function ChatArea({
         )}
 
         {/* Input */}
-        <div className="px-5 pb-5 pt-1 shrink-0">
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-end gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-3 shadow-sm focus-within:border-neutral-400 focus-within:ring-1 focus-within:ring-neutral-400/20 transition-all">
+        <div className="px-4 pb-4 pt-1 shrink-0">
+          <div className="max-w-3xl mx-auto rounded-xl border border-neutral-200 bg-neutral-50/80 shadow-sm focus-within:border-neutral-300 focus-within:bg-white focus-within:shadow-md transition-all duration-200">
+            {/* Toolbar row */}
+            <div className="flex items-center gap-0.5 px-3 pt-2.5 pb-1">
+              <button type="button" title="Bold" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors text-xs font-bold">
+                B
+              </button>
+              <button type="button" title="Italic" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors text-xs italic">
+                I
+              </button>
+              <button type="button" title="Code" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors font-mono text-[11px]">
+                {"</>"}
+              </button>
+              <div className="h-4 w-px bg-neutral-200 mx-1" />
+              <button type="button" title="Link" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+              </button>
+              <button type="button" title="Emoji" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors">
+                <Smile className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {/* Text area */}
+            <div className="px-3 pb-1">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -213,16 +233,35 @@ export function ChatArea({
                 onKeyDown={handleKeyDown}
                 placeholder={`Message #${roomName}`}
                 rows={1}
-                className="flex-1 bg-transparent text-[14px] text-neutral-900 placeholder:text-neutral-400 resize-none outline-none leading-relaxed"
+                className="w-full bg-transparent text-[14px] text-neutral-900 placeholder:text-neutral-400 resize-none outline-none leading-relaxed min-h-[28px] max-h-[150px]"
               />
-              <Button
-                size="icon"
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="h-8 w-8 rounded-md shrink-0 disabled:opacity-20"
-              >
-                <SendHorizontal className="h-4 w-4" />
-              </Button>
+            </div>
+            {/* Bottom row */}
+            <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
+              <div className="flex items-center gap-0.5">
+                <button type="button" title="Attach file" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors">
+                  <Paperclip className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" title="Mention someone" className="h-7 w-7 rounded-md flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 transition-colors text-sm font-medium">
+                  @
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-neutral-300">
+                  {input.trim() ? "Enter to send" : ""}
+                </span>
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-150 ${
+                    input.trim()
+                      ? "bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm"
+                      : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
+                  }`}
+                >
+                  <SendHorizontal className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

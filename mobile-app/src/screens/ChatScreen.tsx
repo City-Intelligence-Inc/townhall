@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,75 +6,155 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import { useUser, useAuth } from '@clerk/clerk-expo';
 import { Sidebar } from '../components/chat/Sidebar';
 import { ChatArea } from '../components/chat/ChatArea';
 import { MembersPanel } from '../components/chat/MembersPanel';
 import { Colors } from '../constants/theme';
 import { Room, Message, Member } from '../constants/types';
-
-const DEFAULT_ROOMS: Room[] = [
-  { room_id: '1', name: 'general', description: 'Company-wide announcements and chat' },
-  { room_id: '2', name: 'random', description: 'Water cooler conversation' },
-  { room_id: '3', name: 'engineering', description: 'Dev discussions and code reviews' },
-];
-
-// Generate a simple unique ID (no crypto.randomUUID on RN)
-let _counter = 0;
-function uid() {
-  return `${Date.now()}-${++_counter}`;
-}
+import * as api from '../services/api';
 
 export default function ChatScreen() {
-  const [rooms, setRooms] = useState<Room[]>(DEFAULT_ROOMS);
-  const [activeRoomId, setActiveRoomId] = useState('1');
+  const { user } = useUser();
+  const { signOut } = useAuth();
+
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
-  const [messagesByRoom, setMessagesByRoom] = useState<Record<string, Message[]>>({});
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const activeRoom = rooms.find((r) => r.room_id === activeRoomId);
-  const messages = messagesByRoom[activeRoomId] || [];
+  const userId = user?.id ?? '';
+  const username = user?.username || user?.firstName || 'User';
+  const avatarUrl = user?.imageUrl;
 
-  // Mock user — will be replaced with Clerk user
-  const mockUser = {
-    id: 'me',
-    username: 'You',
-    avatar_url: undefined as string | undefined,
-  };
+  // Sync user + load rooms on mount
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
 
-  const members: Member[] = [
-    { user_id: mockUser.id, username: mockUser.username, is_online: true },
-  ];
+    (async () => {
+      try {
+        await api.syncUser(userId, username, avatarUrl);
+        const allRooms = await api.getRooms();
+
+        if (cancelled) return;
+
+        if (allRooms.length === 0) {
+          // Create default #general channel
+          const general = await api.createRoom('general', 'Company-wide announcements and chat');
+          await api.joinRoom(general.room_id, userId, username);
+          setRooms([general]);
+          setActiveRoomId(general.room_id);
+        } else {
+          setRooms(allRooms);
+          setActiveRoomId(allRooms[0].room_id);
+        }
+      } catch {
+        // offline / backend unreachable — show empty state
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  // Load messages + members + WebSocket when active room changes
+  useEffect(() => {
+    if (!activeRoomId || !userId) return;
+    let cancelled = false;
+    let connectionId: string | null = null;
+
+    (async () => {
+      try {
+        const [msgs, mems] = await Promise.all([
+          api.getMessages(activeRoomId),
+          api.getMembers(activeRoomId),
+        ]);
+        if (cancelled) return;
+        setMessages(msgs);
+        setMembers(mems);
+
+        const conn = await api.registerConnection(activeRoomId, userId);
+        if (!cancelled) connectionId = conn.connection_id;
+      } catch {
+        // fail silently
+      }
+    })();
+
+    // WebSocket for real-time messages
+    const ws = api.connectWebSocket(activeRoomId, userId, (msg) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      ws.close();
+      if (connectionId) api.removeConnection(connectionId);
+    };
+  }, [activeRoomId, userId]);
 
   const handleSend = useCallback(
-    (content: string) => {
-      const msg: Message = {
-        id: uid(),
-        user_id: mockUser.id,
-        username: mockUser.username,
-        avatar_url: mockUser.avatar_url,
+    async (content: string) => {
+      if (!activeRoomId || !userId) return;
+
+      // Optimistic update
+      const optimistic: Message = {
+        id: `temp-${Date.now()}`,
+        user_id: userId,
+        username,
+        avatar_url: avatarUrl,
         content,
         created_at: new Date().toISOString(),
       };
-      setMessagesByRoom((prev) => ({
-        ...prev,
-        [activeRoomId]: [...(prev[activeRoomId] || []), msg],
-      }));
+      setMessages((prev) => [...prev, optimistic]);
+
+      try {
+        await api.sendMessage(activeRoomId, userId, username, content, avatarUrl);
+      } catch {
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      }
     },
-    [activeRoomId],
+    [activeRoomId, userId, username, avatarUrl],
   );
 
-  const handleCreateRoom = useCallback((name: string, description: string) => {
-    const room: Room = { room_id: uid(), name, description };
-    setRooms((prev) => [...prev, room]);
-    setActiveRoomId(room.room_id);
-  }, []);
+  const handleCreateRoom = useCallback(
+    async (name: string, description: string) => {
+      if (!userId) return;
+      try {
+        const room = await api.createRoom(name, description);
+        await api.joinRoom(room.room_id, userId, username);
+        setRooms((prev) => [...prev, room]);
+        setActiveRoomId(room.room_id);
+      } catch {
+        // fail silently
+      }
+    },
+    [userId, username],
+  );
 
+  const activeRoom = rooms.find((r) => r.room_id === activeRoomId);
   const screenWidth = Dimensions.get('window').width;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.loading}>
+        <ActivityIndicator size="large" color={Colors.textMuted} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Chat area — always visible */}
+      {/* Chat area */}
       <ChatArea
         roomName={activeRoom?.name || 'general'}
         roomDescription={activeRoom?.description}
@@ -85,7 +165,7 @@ export default function ChatScreen() {
         showMembers={showMembers}
       />
 
-      {/* Sidebar drawer — slides from left */}
+      {/* Sidebar drawer */}
       <Modal
         visible={showSidebar}
         transparent
@@ -105,15 +185,16 @@ export default function ChatScreen() {
                 setShowSidebar(false);
               }}
               onCreateRoom={handleCreateRoom}
-              userName={mockUser.username}
-              userAvatar={mockUser.avatar_url}
+              userName={username}
+              userAvatar={avatarUrl}
               onClose={() => setShowSidebar(false)}
+              onSignOut={signOut}
             />
           </SafeAreaView>
         </View>
       </Modal>
 
-      {/* Members panel — slides from right */}
+      {/* Members panel */}
       <Modal
         visible={showMembers}
         transparent
@@ -137,6 +218,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.white,
+  },
+  loading: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   drawerOverlay: {
     ...StyleSheet.absoluteFillObject,

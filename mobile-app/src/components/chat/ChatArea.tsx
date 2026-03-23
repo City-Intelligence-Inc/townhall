@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   msgAvatar: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 8,
     marginTop: 2,
   },
   msgAvatarFallback: {
