@@ -195,17 +195,37 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     for (const file of files) {
-      try {
-        const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch(`${API}/api/uploads/`, { method: "POST", body: formData });
-        if (res.ok) {
-          const data = await res.json();
-          const isImage = file.type.startsWith("image/");
-          onSendMessage(isImage ? `![${file.name}](${data.url})` : `[${file.name}](${data.url})`);
+      const isTextFile = file.type.startsWith("text/") ||
+        file.name.match(/\.(md|txt|markdown|json|csv|log|xml|yaml|yml|toml|sh|py|js|ts|jsx|tsx|html|css|sql)$/i);
+
+      if (isTextFile) {
+        // Read text content and paste into input
+        const reader = new FileReader();
+        reader.onload = () => {
+          const text = reader.result as string;
+          const header = `**📎 ${file.name}**\n\n`;
+          setInput((prev) => prev ? prev + "\n" + header + text : header + text);
+          textareaRef.current?.focus();
+        };
+        reader.readAsText(file);
+      } else {
+        // Binary file — try upload endpoint, fallback to file info message
+        try {
+          const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch(`${API}/api/uploads/`, { method: "POST", body: formData });
+          if (res.ok) {
+            const data = await res.json();
+            const isImage = file.type.startsWith("image/");
+            onSendMessage(isImage ? `![${file.name}](${data.url})` : `📎 [${file.name}](${data.url})`);
+          } else {
+            onSendMessage(`📎 Shared file: **${file.name}** (${(file.size / 1024).toFixed(1)} KB)`);
+          }
+        } catch {
+          onSendMessage(`📎 Shared file: **${file.name}** (${(file.size / 1024).toFixed(1)} KB)`);
         }
-      } catch { /* upload failed */ }
+      }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [onSendMessage]);
