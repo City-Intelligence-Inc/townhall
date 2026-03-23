@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/messages", tags=["Messages"])
 class MessageCreate(BaseModel):
     sender_id: str
     content: str
+    sender_name: Optional[str] = None
     type: str = "text"
 
 
@@ -62,6 +63,7 @@ def send_message(room_id: str, body: MessageCreate):
         "sortKey": sort_key,
         "messageId": message_id,
         "senderId": body.sender_id,
+        "senderName": body.sender_name,
         "content": body.content,
         "type": body.type,
         "createdAt": now,

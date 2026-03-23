@@ -5,7 +5,6 @@ import { useUser } from "@clerk/nextjs";
 import { Hash, Users, SendHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Message {
   id: string;
@@ -93,8 +92,7 @@ export function ChatArea({
   }
 
   return (
-    <TooltipProvider delayDuration={0}>
-      <div className="flex flex-col flex-1 min-w-0 bg-white">
+    <div className="flex flex-col flex-1 min-w-0 bg-white">
         {/* Header */}
         <div className="flex items-center justify-between px-5 h-12 border-b border-neutral-200 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -107,21 +105,15 @@ export function ChatArea({
               </>
             )}
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={showMembers ? "secondary" : "ghost"}
-                size="icon"
-                className="h-8 w-8"
-                onClick={onToggleMembers}
-              >
-                <Users className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-              {showMembers ? "Hide" : "Show"} members
-            </TooltipContent>
-          </Tooltip>
+          <button
+            title={showMembers ? "Hide members" : "Show members"}
+            onClick={onToggleMembers}
+            className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors ${
+              showMembers ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100"
+            }`}
+          >
+            <Users className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Messages */}
@@ -235,6 +227,5 @@ export function ChatArea({
           </div>
         </div>
       </div>
-    </TooltipProvider>
   );
 }

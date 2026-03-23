@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
 
-from app.db import room_members_table, chat_rooms_table
+from app.db import room_members_table, chat_rooms_table, users_table
 
 router = APIRouter(prefix="/api/members", tags=["Room Members"])
 
@@ -15,14 +15,25 @@ class KickMember(BaseModel):
     admin_user_id: str
 
 
-# ─── GET /api/members/{room_id} ── List members of a room ───────────────────
+# ─── GET /api/members/{room_id} ── List members of a room (enriched) ────────
 @router.get("/{room_id}")
 def list_members(room_id: str):
     result = room_members_table.query(
         KeyConditionExpression="roomId = :rid",
         ExpressionAttributeValues={":rid": room_id},
     )
-    return {"members": result.get("Items", [])}
+    members = result.get("Items", [])
+
+    # Enrich with user data
+    for m in members:
+        user = users_table.get_item(Key={"userId": m["userId"]}).get("Item")
+        if user:
+            m["username"] = user.get("username", m["userId"])
+            m["avatarUrl"] = user.get("avatarUrl")
+        else:
+            m["username"] = m["userId"]
+
+    return {"members": members}
 
 
 # ─── GET /api/members/user/{user_id} ── Rooms a user belongs to (GSI) ───────

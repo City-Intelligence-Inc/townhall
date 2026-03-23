@@ -10,6 +10,7 @@ router = APIRouter(prefix="/api/users", tags=["Users"])
 
 
 class UserCreate(BaseModel):
+    id: Optional[str] = None
     username: str
     email: str
     avatar_url: Optional[str] = None
@@ -45,8 +46,25 @@ def get_user(user_id: str):
 @router.post("/", status_code=201)
 def create_user(body: UserCreate):
     now = datetime.now(timezone.utc).isoformat()
+    user_id = body.id or str(uuid.uuid4())
+
+    # Upsert: if user already exists, just update
+    existing = users_table.get_item(Key={"userId": user_id}).get("Item")
+    if existing:
+        users_table.update_item(
+            Key={"userId": user_id},
+            UpdateExpression="SET username = :u, avatarUrl = :a, updatedAt = :now",
+            ExpressionAttributeValues={
+                ":u": body.username,
+                ":a": body.avatar_url,
+                ":now": now,
+            },
+        )
+        existing.update({"username": body.username, "avatarUrl": body.avatar_url, "updatedAt": now})
+        return {"user": existing}
+
     item = {
-        "userId": str(uuid.uuid4()),
+        "userId": user_id,
         "username": body.username,
         "email": body.email,
         "avatarUrl": body.avatar_url,
