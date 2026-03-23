@@ -65,7 +65,9 @@ mobile-app/
 
 - **EAS Project**: `@arihantchoudhary/chatroom-mobile`
 - **Bundle ID**: `com.chatroom.mobile`
-- **App Name**: "Chat Room"
+- **App Name**: "Townhall"
+- **App Icon**: Black (#171717) background, white classical pillared building
+- **Current Build Number**: 9
 
 ## Related
 - [[mobile/Components]]

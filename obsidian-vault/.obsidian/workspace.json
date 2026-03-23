@@ -23,12 +23,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "backend/Real-time.md",
+                "file": "interview/Talking Points.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Real-time"
+              "title": "Talking Points"
             }
           }
         ],
@@ -196,7 +196,10 @@
   },
   "active": "005cc29034e5260f",
   "lastOpenFiles": [
+    "mobile/Test Plan.md",
+    "mobile/API Client.md",
     "00 - Home.md",
+    "backend/Real-time.md",
     "architecture/Overview.md",
     "mobile/Auth.md",
     "mobile/Components.md",
@@ -215,7 +218,6 @@
     "data-model/Messages Table.md",
     "data-model/Connections Table.md",
     "data-model/Chat Rooms Table.md",
-    "backend/Real-time.md",
     "backend/API Reference.md",
     "Untitled.md"
   ]

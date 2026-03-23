@@ -1,28 +1,46 @@
 import { API_URL, WS_URL } from '../constants/api';
 import { Room, Message, Member } from '../constants/types';
 
-// ── Rooms ──────────────────────────────────────────────────────
-export async function getRooms(): Promise<Room[]> {
-  const res = await fetch(`${API_URL}/api/rooms/`);
-  if (!res.ok) throw new Error('Failed to fetch rooms');
+// ── Auth token management (mirrors web frontend pattern) ──────
+let _getToken: (() => Promise<string | null>) | null = null;
+
+export function setTokenProvider(fn: () => Promise<string | null>) {
+  _getToken = fn;
+}
+
+async function apiFetch(path: string, opts?: RequestInit) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(opts?.headers as Record<string, string>),
+  };
+
+  if (_getToken) {
+    try {
+      const token = await _getToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+    } catch {}
+  }
+
+  const res = await fetch(`${API_URL}${path}`, { ...opts, headers });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
+// ── Rooms ──────────────────────────────────────────────────────
+export async function getRooms(): Promise<Room[]> {
+  return apiFetch('/api/rooms/');
+}
+
 export async function createRoom(name: string, description: string): Promise<Room> {
-  const res = await fetch(`${API_URL}/api/rooms/`, {
+  return apiFetch('/api/rooms/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, description }),
   });
-  if (!res.ok) throw new Error('Failed to create room');
-  return res.json();
 }
 
 // ── Messages ───────────────────────────────────────────────────
 export async function getMessages(roomId: string): Promise<Message[]> {
-  const res = await fetch(`${API_URL}/api/messages/${roomId}`);
-  if (!res.ok) throw new Error('Failed to fetch messages');
-  return res.json();
+  return apiFetch(`/api/messages/${roomId}`);
 }
 
 export async function sendMessage(
@@ -32,41 +50,39 @@ export async function sendMessage(
   content: string,
   avatarUrl?: string,
 ): Promise<Message> {
-  const res = await fetch(`${API_URL}/api/messages/${roomId}`, {
+  return apiFetch(`/api/messages/${roomId}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      user_id: userId,
-      username,
+      sender_id: userId,
+      sender_name: username,
       content,
       avatar_url: avatarUrl,
     }),
   });
-  if (!res.ok) throw new Error('Failed to send message');
-  return res.json();
 }
 
 // ── Members ────────────────────────────────────────────────────
 export async function getMembers(roomId: string): Promise<Member[]> {
-  const res = await fetch(`${API_URL}/api/members/${roomId}`);
-  if (!res.ok) throw new Error('Failed to fetch members');
-  return res.json();
+  return apiFetch(`/api/members/${roomId}`);
 }
 
 export async function joinRoom(roomId: string, userId: string, username: string): Promise<void> {
-  await fetch(`${API_URL}/api/members/${roomId}/join`, {
+  await apiFetch(`/api/members/${roomId}/join`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: userId, username }),
   });
 }
 
 // ── Users ──────────────────────────────────────────────────────
-export async function syncUser(userId: string, username: string, avatarUrl?: string): Promise<void> {
-  await fetch(`${API_URL}/api/users/`, {
+export async function syncUser(
+  userId: string,
+  username: string,
+  email: string,
+  avatarUrl?: string,
+): Promise<void> {
+  await apiFetch('/api/users/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, username, avatar_url: avatarUrl }),
+    body: JSON.stringify({ id: userId, username, email, avatar_url: avatarUrl }),
   });
 }
 
@@ -75,17 +91,14 @@ export async function registerConnection(
   roomId: string,
   userId: string,
 ): Promise<{ connection_id: string }> {
-  const res = await fetch(`${API_URL}/api/connections/`, {
+  return apiFetch('/api/connections/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ room_id: roomId, user_id: userId }),
   });
-  if (!res.ok) throw new Error('Failed to register connection');
-  return res.json();
 }
 
 export async function removeConnection(connectionId: string): Promise<void> {
-  await fetch(`${API_URL}/api/connections/${connectionId}`, { method: 'DELETE' });
+  await apiFetch(`/api/connections/${connectionId}`, { method: 'DELETE' });
 }
 
 // ── WebSocket ──────────────────────────────────────────────────

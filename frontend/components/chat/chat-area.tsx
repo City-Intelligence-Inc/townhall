@@ -130,14 +130,13 @@ function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void;
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
   return (
-    <div ref={ref} className="absolute bottom-full mb-2 right-0 bg-white rounded-xl border border-neutral-200 shadow-xl shadow-neutral-200/50 p-2.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-      <p className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider px-1 mb-1.5">Quick reactions</p>
-      <div className="grid grid-cols-4 gap-0.5">
+    <div ref={ref} className="absolute bottom-full mb-2 right-0 bg-white rounded-xl border border-neutral-200 shadow-xl shadow-neutral-200/50 p-2 z-50">
+      <div className="flex items-center gap-1">
         {QUICK_EMOJIS.map((emoji) => (
           <button
             key={emoji}
             onClick={() => { onSelect(emoji); onClose(); }}
-            className="h-9 w-9 rounded-lg flex items-center justify-center text-xl hover:bg-neutral-100 hover:scale-110 active:scale-95 transition-all duration-100"
+            className="h-8 w-8 rounded-md flex items-center justify-center text-[18px] leading-none hover:bg-neutral-100 hover:scale-110 active:scale-95 transition-all duration-100"
           >
             {emoji}
           </button>
@@ -352,9 +351,9 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
   const renderReplyBadge = (msg: Message) => {
     if (!msg.reply_preview) return null;
     return (
-      <div className="flex items-center gap-1.5 mb-1">
-        <div className="w-0.5 h-4 rounded-full bg-neutral-300" />
-        <span className="text-[12px] text-neutral-400 truncate max-w-md"><span className="font-medium text-neutral-500">{msg.reply_username || "someone"}</span> {msg.reply_preview}</span>
+      <div className="flex items-center gap-2 mb-1.5 pl-1">
+        <div className="w-0.5 h-4 rounded-full bg-blue-300 shrink-0" />
+        <span className="text-[12px] text-neutral-500 truncate max-w-md leading-normal"><span className="font-semibold text-neutral-600">{msg.reply_username || "someone"}</span> {msg.reply_preview}</span>
       </div>
     );
   };

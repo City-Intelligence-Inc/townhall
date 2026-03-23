@@ -4,8 +4,29 @@
 
 Mobile uses **Clerk** (`@clerk/clerk-expo`) — same auth provider as web. Users can sign in with:
 - Email + password
-- Google OAuth
-- Apple OAuth
+- Google OAuth (Ionicons `logo-google` icon)
+- Apple OAuth (Ionicons `logo-apple` icon, black button)
+
+## Auth Token Injection
+
+Mobile mirrors the web's token provider pattern. On mount, `ChatScreen` calls:
+
+```typescript
+api.setTokenProvider(getToken);  // from useAuth()
+```
+
+Every API call via `apiFetch()` then automatically attaches `Authorization: Bearer <jwt>` headers — identical to the web frontend's `lib/api.ts` pattern. This ensures all protected backend endpoints (create room, send message, etc.) work from mobile.
+
+## User Sync
+
+After login, mobile syncs the Clerk user to the backend:
+
+```typescript
+api.syncUser(userId, username, email, avatarUrl);
+// Sends: { id, username, email, avatar_url } → POST /api/users/
+```
+
+**Important**: The backend's `UserCreate` model requires `id` (not `user_id`) and `email` is a required field.
 
 ## Flow
 
@@ -14,7 +35,9 @@ Mobile uses **Clerk** (`@clerk/clerk-expo`) — same auth provider as web. Users
 2. AppNavigator checks useAuth().isSignedIn
 3. Not signed in → SignInScreen / SignUpScreen
 4. Signed in → ChatScreen
-5. Token cached in expo-secure-store (persists across app restarts)
+5. ChatScreen sets up token provider → api.setTokenProvider(getToken)
+6. ChatScreen syncs user → api.syncUser(id, username, email, avatarUrl)
+7. Token cached in expo-secure-store (persists across app restarts)
 ```
 
 ## ClerkProvider Setup (`App.tsx`)

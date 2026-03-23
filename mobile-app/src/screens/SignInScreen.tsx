@@ -12,6 +12,7 @@ import {
 import { useSignIn, useOAuth } from '@clerk/clerk-expo';
 import * as WebBrowser from 'expo-web-browser';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -74,17 +75,17 @@ export default function SignInScreen() {
           onPress={() => handleOAuth(startGoogle)}
           disabled={loading}
         >
-          <Text style={styles.oauthIcon}>G</Text>
+          <Ionicons name="logo-google" size={20} color={Colors.text} style={styles.oauthIcon} />
           <Text style={styles.oauthText}>Continue with Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.oauthButton}
+          style={[styles.oauthButton, styles.appleButton]}
           onPress={() => handleOAuth(startApple)}
           disabled={loading}
         >
-          <Text style={styles.oauthIcon}>{'\uF8FF'}</Text>
-          <Text style={styles.oauthText}>Continue with Apple</Text>
+          <Ionicons name="logo-apple" size={22} color="#fff" style={styles.oauthIcon} />
+          <Text style={[styles.oauthText, styles.appleText]}>Continue with Apple</Text>
         </TouchableOpacity>
 
         <View style={styles.divider}>
@@ -231,10 +232,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   oauthIcon: {
-    fontSize: 18,
-    fontWeight: '700',
     marginRight: 10,
-    color: Colors.text,
+  },
+  appleButton: {
+    backgroundColor: '#000',
+    borderColor: '#000',
+  },
+  appleText: {
+    color: '#fff',
   },
   oauthText: {
     fontSize: Fonts.regular,

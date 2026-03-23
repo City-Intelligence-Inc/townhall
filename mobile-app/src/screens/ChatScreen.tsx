@@ -18,7 +18,7 @@ import * as api from '../services/api';
 
 export default function ChatScreen() {
   const { user } = useUser();
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
 
   const [rooms, setRooms] = useState<Room[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
@@ -31,6 +31,12 @@ export default function ChatScreen() {
   const userId = user?.id ?? '';
   const username = user?.username || user?.firstName || 'User';
   const avatarUrl = user?.imageUrl;
+  const email = user?.primaryEmailAddress?.emailAddress || '';
+
+  // Set up auth token provider for API calls (matching web frontend)
+  useEffect(() => {
+    api.setTokenProvider(getToken);
+  }, [getToken]);
 
   // Sync user + load rooms on mount
   useEffect(() => {
@@ -39,7 +45,7 @@ export default function ChatScreen() {
 
     (async () => {
       try {
-        await api.syncUser(userId, username, avatarUrl);
+        await api.syncUser(userId, username, email, avatarUrl);
         const allRooms = await api.getRooms();
 
         if (cancelled) return;
