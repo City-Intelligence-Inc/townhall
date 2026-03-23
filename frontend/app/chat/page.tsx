@@ -327,7 +327,7 @@ export default function ChatPage() {
       {showOnboarding && (
         <Onboarding
           onComplete={handleOnboardingComplete}
-          userName={user?.fullName || user?.username}
+          userName={user?.fullName || user?.username || undefined}
         />
       )}
       <Sidebar
