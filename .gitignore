@@ -1,10 +1,19 @@
 frontend/.env.local
+frontend/node_modules/
 backend/.env
 backend/__pycache__/
 backend/*.db
+backend/venv/
 
 # Terraform
 **/.terraform/
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
