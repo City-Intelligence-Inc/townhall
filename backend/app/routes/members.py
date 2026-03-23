@@ -116,4 +116,75 @@ def kick_member(room_id: str, user_id: str, admin_user_id: str):
         raise HTTPException(status_code=403, detail="Only admins can kick members")
 
     room_members_table.delete_item(Key={"roomId": room_id, "userId": user_id})
+
+    # Broadcast kick via SSE
+    from app.routes.sse import publish
+    publish(room_id, "member_kicked", {"userId": user_id})
+
     return {"message": "Member kicked"}
+
+
+class MuteRequest(BaseModel):
+    admin_user_id: str
+    duration_minutes: int = 10
+
+
+# ─── POST /api/members/{room_id}/mute/{user_id} ── Mute member (admin) ──────
+@router.post("/{room_id}/mute/{user_id}")
+def mute_member(room_id: str, user_id: str, body: MuteRequest):
+    # Verify admin
+    admin = room_members_table.get_item(
+        Key={"roomId": room_id, "userId": body.admin_user_id}
+    )
+    if not admin.get("Item") or admin["Item"].get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can mute members")
+
+    muted_until = (datetime.now(timezone.utc) + timedelta(minutes=body.duration_minutes)).isoformat()
+    room_members_table.update_item(
+        Key={"roomId": room_id, "userId": user_id},
+        UpdateExpression="SET mutedUntil = :mu",
+        ExpressionAttributeValues={":mu": muted_until},
+    )
+
+    from app.routes.sse import publish
+    publish(room_id, "member_muted", {"userId": user_id, "mutedUntil": muted_until})
+
+    return {"message": "Member muted", "mutedUntil": muted_until}
+
+
+# ─── POST /api/members/{room_id}/unmute/{user_id} ── Unmute member ──────────
+@router.post("/{room_id}/unmute/{user_id}")
+def unmute_member(room_id: str, user_id: str, admin_user_id: str):
+    admin = room_members_table.get_item(
+        Key={"roomId": room_id, "userId": admin_user_id}
+    )
+    if not admin.get("Item") or admin["Item"].get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can unmute members")
+
+    room_members_table.update_item(
+        Key={"roomId": room_id, "userId": user_id},
+        UpdateExpression="REMOVE mutedUntil",
+    )
+    return {"message": "Member unmuted"}
+
+
+# ─── POST /api/members/{room_id}/ban/{user_id} ── Ban member (admin) ────────
+@router.post("/{room_id}/ban/{user_id}")
+def ban_member(room_id: str, user_id: str, admin_user_id: str):
+    admin = room_members_table.get_item(
+        Key={"roomId": room_id, "userId": admin_user_id}
+    )
+    if not admin.get("Item") or admin["Item"].get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can ban members")
+
+    # Mark as banned in membership, then remove
+    room_members_table.update_item(
+        Key={"roomId": room_id, "userId": user_id},
+        UpdateExpression="SET banned = :b",
+        ExpressionAttributeValues={":b": True},
+    )
+
+    from app.routes.sse import publish
+    publish(room_id, "member_banned", {"userId": user_id})
+
+    return {"message": "Member banned"}

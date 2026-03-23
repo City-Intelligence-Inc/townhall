@@ -12,6 +12,7 @@ interface Room {
   room_id: string;
   name: string;
   description?: string;
+  unread_count?: number;
 }
 
 interface Message {
@@ -21,6 +22,7 @@ interface Message {
   avatar_url?: string;
   content: string;
   created_at: string;
+  sort_key?: string;
 }
 
 interface Member {
@@ -40,9 +42,14 @@ export default function ChatPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const sseRef = useRef<EventSource | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
   // Map of userId -> { username, avatar_url } for enriching messages
   const userMapRef = useRef<Map<string, { username: string; avatar_url?: string }>>(new Map());
+  // Track lastReadAt per room for unread badges
+  const lastReadRef = useRef<Map<string, string>>(new Map());
 
   // Set up auth token provider for API calls
   useEffect(() => {
@@ -95,9 +102,30 @@ export default function ChatPage() {
           } catch {}
         }
 
-        setRooms(mapped);
-        if (mapped.length > 0 && !activeRoomId) {
-          setActiveRoomId(mapped[0].room_id);
+        // Compute unread counts per room
+        const roomsWithUnread = await Promise.all(
+          mapped.map(async (r) => {
+            try {
+              const readData = await api.getReadStatus(r.room_id, user!.id);
+              const lastRead = readData.lastReadAt;
+              if (lastRead) lastReadRef.current.set(r.room_id, lastRead);
+              if (!lastRead) return { ...r, unread_count: 0 };
+              // Count messages newer than lastReadAt
+              const msgData = await api.listMessages(r.room_id, 50);
+              const unread = msgData.messages.filter(
+                (m: { created_at: string; sender_id: string }) =>
+                  m.created_at > lastRead && m.sender_id !== user!.id
+              ).length;
+              return { ...r, unread_count: unread };
+            } catch {
+              return { ...r, unread_count: 0 };
+            }
+          })
+        );
+
+        setRooms(roomsWithUnread);
+        if (roomsWithUnread.length > 0 && !activeRoomId) {
+          setActiveRoomId(roomsWithUnread[0].room_id);
         }
       } catch (e) {
         console.error("Failed to load rooms:", e);
@@ -152,7 +180,7 @@ export default function ChatPage() {
         }
 
         // Enrich messages
-        const msgs: Message[] = msgData.messages.map((m: { id: string; sender_id: string; sender_name: string; content: string; created_at: string }) => {
+        const msgs: Message[] = msgData.messages.map((m: { id: string; sender_id: string; sender_name: string; content: string; created_at: string; sort_key?: string }) => {
           const cached = umap.get(m.sender_id);
           return {
             id: m.id,
@@ -161,6 +189,7 @@ export default function ChatPage() {
             avatar_url: cached?.avatar_url,
             content: m.content,
             created_at: m.created_at,
+            sort_key: m.sort_key,
           };
         });
         setMessages(msgs);
@@ -214,8 +243,17 @@ export default function ChatPage() {
     };
   }, [activeRoomId, user]);
 
-  // SSE for real-time messages from OTHER users only
-  // (our own messages are already shown optimistically — no need to add them again)
+  // Mark room as read when switching rooms
+  useEffect(() => {
+    if (!activeRoomId || !user) return;
+    api.markRead(activeRoomId, user.id).catch(() => {});
+    // Clear unread count for this room
+    setRooms((prev) => prev.map((r) =>
+      r.room_id === activeRoomId ? { ...r, unread_count: 0 } : r
+    ));
+  }, [activeRoomId, user]);
+
+  // SSE for real-time messages, typing, and deletions
   useEffect(() => {
     if (!activeRoomId || !user) return;
 
@@ -226,7 +264,7 @@ export default function ChatPage() {
     const sse = api.connectSSE(activeRoomId);
     sseRef.current = sse;
 
-    const handleSSE = (event: MessageEvent) => {
+    const handleNewMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
         if (!data.content) return;
@@ -244,28 +282,102 @@ export default function ChatPage() {
           avatar_url: cached?.avatar_url,
           content: data.content,
           created_at: data.createdAt || data.created_at || new Date().toISOString(),
+          sort_key: data.sortKey || data.sort_key,
         };
 
         setMessages((prev) => {
-          // Dedup by ID
           if (prev.some((m) => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
+
+        // Increment unread for other rooms
+        setRooms((prev) => prev.map((r) => {
+          if (r.room_id === activeRoomId) return r;
+          const msgRoom = data.roomId || data.room_id;
+          if (r.room_id === msgRoom) {
+            return { ...r, unread_count: (r.unread_count || 0) + 1 };
+          }
+          return r;
+        }));
       } catch {}
     };
 
-    // Listen to both named and unnamed events
-    sse.addEventListener("new_message", handleSSE);
-    sse.onmessage = handleSSE;
+    const handleTyping = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        const typerId = data.user_id || data.userId;
+        if (typerId === user.id) return;
+        const typerName = data.username || userMapRef.current.get(typerId)?.username || typerId;
+        setTypingUsers((prev) => {
+          if (prev.includes(typerName)) return prev;
+          return [...prev, typerName];
+        });
+        // Auto-remove after 5s
+        setTimeout(() => {
+          setTypingUsers((prev) => prev.filter((n) => n !== typerName));
+        }, 5000);
+      } catch {}
+    };
+
+    const handleStopTyping = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        const typerId = data.user_id || data.userId;
+        const typerName = data.username || userMapRef.current.get(typerId)?.username || typerId;
+        setTypingUsers((prev) => prev.filter((n) => n !== typerName));
+      } catch {}
+    };
+
+    const handleDeleteMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        const sortKey = data.sortKey || data.sort_key;
+        if (sortKey) {
+          setMessages((prev) => prev.filter((m) => m.sort_key !== sortKey));
+        }
+      } catch {}
+    };
+
+    sse.addEventListener("new_message", handleNewMessage);
+    sse.addEventListener("typing", handleTyping);
+    sse.addEventListener("stop_typing", handleStopTyping);
+    sse.addEventListener("message_deleted", handleDeleteMessage);
+    sse.onmessage = handleNewMessage;
 
     return () => {
       sse.close();
+      setTypingUsers([]);
     };
   }, [activeRoomId, user]);
+
+  // Typing indicator: debounced — sends typing on keypress, stop after 3s idle
+  const handleTypingStart = useCallback(() => {
+    if (!user || !activeRoomId) return;
+    const name = user.fullName || user.username || "User";
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      api.sendTyping(activeRoomId, { user_id: user.id, username: name }).catch(() => {});
+    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      api.sendStopTyping(activeRoomId, { user_id: user.id, username: name }).catch(() => {});
+    }, 3000);
+  }, [user, activeRoomId]);
 
   const handleSend = useCallback(
     async (content: string) => {
       if (!user || !activeRoomId) return;
+
+      // Stop typing indicator on send
+      if (isTypingRef.current) {
+        isTypingRef.current = false;
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        api.sendStopTyping(activeRoomId, {
+          user_id: user.id,
+          username: user.fullName || user.username || "User",
+        }).catch(() => {});
+      }
 
       // Optimistic
       const tempId = crypto.randomUUID();
@@ -286,11 +398,27 @@ export default function ChatPage() {
           sender_id: user.id,
           content,
         });
+        // Mark as read after sending
+        api.markRead(activeRoomId, user.id).catch(() => {});
       } catch (e) {
         console.error("Failed to send:", e);
       }
     },
     [user, activeRoomId],
+  );
+
+  const handleDeleteMessage = useCallback(
+    async (messageId: string, sortKey?: string) => {
+      if (!activeRoomId || !sortKey) return;
+      // Optimistic remove
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      try {
+        await api.deleteMessage(activeRoomId, sortKey);
+      } catch (e) {
+        console.error("Failed to delete:", e);
+      }
+    },
+    [activeRoomId],
   );
 
   const handleCreateRoom = useCallback(
@@ -349,6 +477,10 @@ export default function ChatPage() {
         onSendMessage={handleSend}
         onToggleMembers={() => setShowMembers((s) => !s)}
         showMembers={showMembers}
+        typingUsers={typingUsers}
+        onTyping={handleTypingStart}
+        onDeleteMessage={handleDeleteMessage}
+        currentUserId={user?.id}
       />
       {showMembers && <MembersPanel members={members} />}
     </div>

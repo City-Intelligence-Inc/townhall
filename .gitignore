@@ -21,3 +21,4 @@ mobile-app/.expo/
 
 # OS
 .DS_Store
+.gstack/

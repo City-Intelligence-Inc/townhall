@@ -5,7 +5,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import users, rooms, members, messages, connections, sse, ws
+from app.routes import users, rooms, members, messages, connections, sse, ws, search
 
 app = FastAPI(
     title="Chat Room API",
@@ -37,3 +37,4 @@ app.include_router(messages.router)
 app.include_router(connections.router)
 app.include_router(sse.router)
 app.include_router(ws.router)
+app.include_router(search.router)

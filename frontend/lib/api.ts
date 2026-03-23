@@ -81,7 +81,7 @@ export async function listMessages(roomId: string, limit = 50, cursor?: string) 
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set("cursor", cursor);
   const data = await apiFetch(`/api/messages/${roomId}?${params}`);
-  const messages = (data.messages || []).map((m: Record<string, string>) => ({
+  const messages = (data.messages || []).map((m: Record<string, unknown>) => ({
     id: m.messageId || m.id || m.sortKey,
     room_id: m.roomId || m.room_id,
     sender_id: m.senderId || m.sender_id,
@@ -90,6 +90,10 @@ export async function listMessages(roomId: string, limit = 50, cursor?: string) 
     type: m.type || "text",
     created_at: m.createdAt || m.created_at,
     sort_key: m.sortKey || m.sort_key,
+    reactions: m.reactions || {},
+    edited_at: m.editedAt || m.edited_at || null,
+    reply_to: m.replyTo || m.reply_to || null,
+    reply_preview: m.replyPreview || m.reply_preview || null,
   }));
   return { messages, cursor: data.cursor, has_more: data.has_more };
 }
@@ -100,6 +104,20 @@ export async function sendMessage(roomId: string, data: { sender_id: string; con
 
 export async function deleteMessage(roomId: string, key: string) {
   return apiFetch(`/api/messages/${roomId}/${encodeURIComponent(key)}`, { method: "DELETE" });
+}
+
+export async function editMessage(roomId: string, sortKey: string, content: string) {
+  return apiFetch(`/api/messages/${roomId}/${encodeURIComponent(sortKey)}`, {
+    method: "PUT",
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function toggleReaction(roomId: string, sortKey: string, data: { user_id: string; emoji: string }) {
+  return apiFetch(`/api/messages/${roomId}/${encodeURIComponent(sortKey)}/reactions`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 // ─── Users ──────────────────────────────────────────────────────────────────
@@ -138,4 +156,41 @@ export function connectWebSocket(roomId: string, userId: string) {
 // ─── SSE ────────────────────────────────────────────────────────────────────
 export function connectSSE(roomId: string) {
   return new EventSource(`${API}/api/sse/${roomId}`);
+}
+
+// ─── Typing indicators ─────────────────────────────────────────────────────
+export async function sendTyping(roomId: string, data: { user_id: string; username: string }) {
+  return apiFetch(`/api/sse/${roomId}/typing`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function sendStopTyping(roomId: string, data: { user_id: string; username: string }) {
+  return apiFetch(`/api/sse/${roomId}/stop_typing`, { method: "POST", body: JSON.stringify(data) });
+}
+
+// ─── Read receipts ──────────────────────────────────────────────────────────
+export async function markRead(roomId: string, userId: string) {
+  return apiFetch(`/api/members/${roomId}/read/${userId}`, { method: "PATCH" });
+}
+
+export async function getReadStatus(roomId: string, userId: string) {
+  return apiFetch(`/api/members/${roomId}/read/${userId}`);
+}
+
+// ─── Search ─────────────────────────────────────────────────────────────────
+export async function searchMessages(query: string, roomId?: string) {
+  const params = new URLSearchParams({ q: query });
+  if (roomId) params.set("room_id", roomId);
+  const data = await apiFetch(`/api/search/?${params}`);
+  return {
+    results: (data.results || []).map((m: Record<string, string>) => ({
+      id: m.messageId || m.id || m.sortKey,
+      room_id: m.roomId || m.room_id,
+      sender_id: m.senderId || m.sender_id,
+      sender_name: m.senderName || m.sender_name,
+      content: m.content,
+      created_at: m.createdAt || m.created_at,
+      sort_key: m.sortKey || m.sort_key,
+    })),
+    count: data.count,
+  };
 }
