@@ -2,8 +2,12 @@ frontend/.env.local
 frontend/node_modules/
 backend/.env
 backend/__pycache__/
+backend/**/__pycache__/
 backend/*.db
 backend/venv/
+mobile-app/node_modules/
+mobile-app/.expo/
+.build-log.md
 
 # Terraform
 **/.terraform/

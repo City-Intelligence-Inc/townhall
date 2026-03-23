@@ -1,0 +1,245 @@
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+import { useSignUp } from '@clerk/clerk-expo';
+import { useNavigation } from '@react-navigation/native';
+import { Colors, Fonts } from '../constants/theme';
+
+export default function SignUpScreen() {
+  const { signUp, setActive, isLoaded } = useSignUp();
+  const navigation = useNavigation<any>();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [code, setCode] = useState('');
+
+  const handleSignUp = useCallback(async () => {
+    if (!isLoaded) return;
+    setError('');
+    setLoading(true);
+    try {
+      await signUp.create({ emailAddress: email, password, username });
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      setPendingVerification(true);
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || 'Sign up failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoaded, signUp, email, password, username]);
+
+  const handleVerify = useCallback(async () => {
+    if (!isLoaded) return;
+    setError('');
+    setLoading(true);
+    try {
+      const result = await signUp.attemptEmailAddressVerification({ code });
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+      }
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoaded, signUp, setActive, code]);
+
+  if (pendingVerification) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.card}>
+          <Text style={styles.title}>Verify your email</Text>
+          <Text style={styles.subtitle}>We sent a code to {email}</Text>
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <Text style={styles.label}>Verification code</Text>
+          <TextInput
+            style={styles.input}
+            value={code}
+            onChangeText={setCode}
+            placeholder="Enter code"
+            placeholderTextColor={Colors.textMuted}
+            keyboardType="number-pad"
+          />
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleVerify}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color={Colors.textOnDark} />
+            ) : (
+              <Text style={styles.buttonText}>Verify</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.card}>
+        <Text style={styles.title}>Create an account</Text>
+        <Text style={styles.subtitle}>Join Townhall</Text>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <Text style={styles.label}>Username</Text>
+        <TextInput
+          style={styles.input}
+          value={username}
+          onChangeText={setUsername}
+          placeholder="johndoe"
+          placeholderTextColor={Colors.textMuted}
+          autoCapitalize="none"
+        />
+
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          placeholderTextColor={Colors.textMuted}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoComplete="email"
+        />
+
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Choose a password"
+          placeholderTextColor={Colors.textMuted}
+          secureTextEntry
+        />
+
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleSignUp}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color={Colors.textOnDark} />
+          ) : (
+            <Text style={styles.buttonText}>Sign Up</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate('SignIn')}
+          style={styles.link}
+        >
+          <Text style={styles.linkText}>
+            Already have an account? <Text style={styles.linkBold}>Sign in</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  title: {
+    color: Colors.text,
+    fontSize: Fonts.xlarge,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: Colors.textMuted,
+    fontSize: Fonts.regular,
+    marginBottom: 20,
+  },
+  label: {
+    color: Colors.textSecondary,
+    fontSize: Fonts.regular,
+    fontWeight: '500',
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  input: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.inputBorder,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: Colors.text,
+    fontSize: Fonts.regular,
+  },
+  button: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: Colors.textOnDark,
+    fontSize: Fonts.regular,
+    fontWeight: '600',
+  },
+  error: {
+    color: Colors.destructive,
+    fontSize: Fonts.caption,
+    marginBottom: 8,
+  },
+  link: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  linkText: {
+    color: Colors.textMuted,
+    fontSize: Fonts.caption,
+  },
+  linkBold: {
+    color: Colors.text,
+    fontWeight: '600',
+  },
+});

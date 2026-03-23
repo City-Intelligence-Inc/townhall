@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "owner": "arihantchoudhary",
+    "name": "Chat Room",
+    "slug": "chatroom-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1d21"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.chatroom.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1d21",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.chatroom.mobile",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bb135ace-37b4-400b-83e3-2526838b4ccc"
+      }
+    }
+  }
+}
