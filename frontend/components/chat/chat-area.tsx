@@ -94,13 +94,21 @@ function ReactionBar({ reactions, currentUserId, onToggle }: { reactions: Record
   const entries = Object.entries(reactions).filter(([, users]) => users.length > 0);
   if (entries.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1 mt-1.5">
+    <div className="flex flex-wrap gap-1.5 mt-2">
       {entries.map(([emoji, users]) => {
         const active = currentUserId && users.includes(currentUserId);
         return (
-          <button key={emoji} onClick={() => onToggle(emoji)} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${active ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-neutral-50 border-neutral-200 text-neutral-600 hover:bg-neutral-100"}`}>
-            <span>{emoji}</span>
-            <span className="tabular-nums font-medium">{users.length}</span>
+          <button
+            key={emoji}
+            onClick={() => onToggle(emoji)}
+            className={`inline-flex items-center gap-1 h-7 px-2 rounded-md text-[12px] border transition-all duration-150 ${
+              active
+                ? "bg-blue-50 border-blue-300 text-blue-700 shadow-sm shadow-blue-100"
+                : "bg-neutral-50 border-neutral-200 text-neutral-600 hover:bg-neutral-100 hover:border-neutral-300"
+            }`}
+          >
+            <span className="text-sm leading-none">{emoji}</span>
+            <span className="tabular-nums font-semibold">{users.length}</span>
           </button>
         );
       })}
@@ -116,10 +124,17 @@ function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void;
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
   return (
-    <div ref={ref} className="absolute bottom-full mb-1 right-0 bg-white rounded-lg border border-neutral-200 shadow-lg p-2 z-50">
-      <div className="grid grid-cols-4 gap-1">
+    <div ref={ref} className="absolute bottom-full mb-2 right-0 bg-white rounded-xl border border-neutral-200 shadow-xl shadow-neutral-200/50 p-2.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+      <p className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider px-1 mb-1.5">Quick reactions</p>
+      <div className="grid grid-cols-4 gap-0.5">
         {QUICK_EMOJIS.map((emoji) => (
-          <button key={emoji} onClick={() => { onSelect(emoji); onClose(); }} className="h-8 w-8 rounded-md flex items-center justify-center text-lg hover:bg-neutral-100 transition-colors">{emoji}</button>
+          <button
+            key={emoji}
+            onClick={() => { onSelect(emoji); onClose(); }}
+            className="h-9 w-9 rounded-lg flex items-center justify-center text-xl hover:bg-neutral-100 hover:scale-110 active:scale-95 transition-all duration-100"
+          >
+            {emoji}
+          </button>
         ))}
       </div>
     </div>
@@ -201,17 +216,58 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
     else { groups[groups.length - 1].msgs.push(msg); }
   }
 
+  const actionBtn = "h-8 w-8 rounded-md flex items-center justify-center transition-all duration-100";
+  const actionIcon = "h-[15px] w-[15px] stroke-[1.75]";
+
   const renderActions = (msg: Message, isOwn: boolean) => (
-    <div className="absolute -top-3 right-5 hidden group-hover:flex items-center gap-0.5 rounded-md bg-white border border-neutral-200 shadow-sm px-0.5 py-0.5 z-10">
+    <div className="absolute -top-4 right-5 hidden group-hover:flex items-center rounded-lg bg-white border border-neutral-200/80 shadow-md shadow-neutral-200/40 px-0.5 py-0.5 z-10">
       {onToggleReaction && msg.sort_key && (
         <div className="relative">
-          <button onClick={() => setEmojiPickerMsgId(emojiPickerMsgId === msg.id ? null : msg.id)} className="h-7 w-7 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors" title="Add reaction"><SmilePlus className="h-3.5 w-3.5" /></button>
-          {emojiPickerMsgId === msg.id && <EmojiPicker onSelect={(emoji) => onToggleReaction(msg.id, msg.sort_key!, emoji)} onClose={() => setEmojiPickerMsgId(null)} />}
+          <button
+            onClick={() => setEmojiPickerMsgId(emojiPickerMsgId === msg.id ? null : msg.id)}
+            className={`${actionBtn} text-neutral-400 hover:text-amber-600 hover:bg-amber-50`}
+            title="Add reaction"
+          >
+            <SmilePlus className={actionIcon} />
+          </button>
+          {emojiPickerMsgId === msg.id && (
+            <EmojiPicker
+              onSelect={(emoji) => onToggleReaction(msg.id, msg.sort_key!, emoji)}
+              onClose={() => setEmojiPickerMsgId(null)}
+            />
+          )}
         </div>
       )}
-      {onReply && <button onClick={() => onReply(msg)} className="h-7 w-7 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors" title="Reply"><Reply className="h-3.5 w-3.5" /></button>}
-      {isOwn && onEditMessage && msg.sort_key && <button onClick={() => startEdit(msg)} className="h-7 w-7 rounded flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors" title="Edit"><Pencil className="h-3.5 w-3.5" /></button>}
-      {isOwn && onDeleteMessage && <button onClick={() => onDeleteMessage(msg.id, msg.sort_key)} className="h-7 w-7 rounded flex items-center justify-center text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>}
+      {onReply && (
+        <button
+          onClick={() => onReply(msg)}
+          className={`${actionBtn} text-neutral-400 hover:text-blue-600 hover:bg-blue-50`}
+          title="Reply"
+        >
+          <Reply className={actionIcon} />
+        </button>
+      )}
+      {isOwn && onEditMessage && msg.sort_key && (
+        <>
+          <div className="w-px h-4 bg-neutral-200 mx-0.5" />
+          <button
+            onClick={() => startEdit(msg)}
+            className={`${actionBtn} text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100`}
+            title="Edit"
+          >
+            <Pencil className={actionIcon} />
+          </button>
+        </>
+      )}
+      {isOwn && onDeleteMessage && (
+        <button
+          onClick={() => onDeleteMessage(msg.id, msg.sort_key)}
+          className={`${actionBtn} text-neutral-400 hover:text-red-500 hover:bg-red-50`}
+          title="Delete"
+        >
+          <Trash2 className={actionIcon} />
+        </button>
+      )}
     </div>
   );
 
