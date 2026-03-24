@@ -6,6 +6,35 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+const _API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+// Cache resolved S3 presigned URLs (key -> { url, expiresAt })
+const s3UrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+async function resolveS3Url(s3Key: string): Promise<string> {
+  const cached = s3UrlCache.get(s3Key);
+  // Use cache if still valid (with 5 min buffer before expiry)
+  if (cached && cached.expiresAt > Date.now() + 300_000) return cached.url;
+
+  try {
+    const res = await fetch(`${_API}/api/uploads/${encodeURIComponent(s3Key)}`);
+    if (res.ok) {
+      const data = await res.json();
+      s3UrlCache.set(s3Key, { url: data.url, expiresAt: Date.now() + 3_500_000 }); // ~58 min
+      return data.url;
+    }
+  } catch {}
+  return "";
+}
+
+function isS3Ref(url: string): boolean {
+  return url.startsWith("s3://");
+}
+
+function getS3Key(url: string): string {
+  return url.slice(5); // strip "s3://"
+}
+
 interface Message {
   id: string;
   user_id: string;
@@ -102,10 +131,22 @@ function FileCard({ name, size, url }: { name: string; size?: string; url?: stri
     csv: "bg-emerald-50 text-emerald-600 border-emerald-100",
   };
   const c = colors[ext] || "bg-neutral-50 text-neutral-500 border-neutral-200";
+  const hasUrl = !!url;
+
+  const handleClick = async () => {
+    if (!url) return;
+    if (isS3Ref(url)) {
+      const resolved = await resolveS3Url(getS3Key(url));
+      if (resolved) window.open(resolved, "_blank");
+    } else {
+      window.open(url, "_blank");
+    }
+  };
+
   return (
     <div
       className="inline-flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 mt-1 mb-0.5 hover:border-neutral-300 hover:shadow-sm transition-all cursor-pointer max-w-sm"
-      onClick={() => url ? window.open(url, "_blank") : null}
+      onClick={handleClick}
     >
       <div className={`flex h-10 w-10 items-center justify-center rounded-lg border shrink-0 ${c}`}>
         <FileText className="h-5 w-5" />
@@ -114,10 +155,10 @@ function FileCard({ name, size, url }: { name: string; size?: string; url?: stri
         <p className="text-[13px] font-medium text-neutral-900 truncate">{name}</p>
         <p className="text-[11px] text-neutral-400">
           {size || ext.toUpperCase() + " file"}
-          {url ? " · Click to open" : " · Attachment"}
+          {hasUrl ? " · Click to open" : " · Attachment"}
         </p>
       </div>
-      {url && (
+      {hasUrl && (
         <svg className="h-4 w-4 text-neutral-300 shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
         </svg>
@@ -142,16 +183,39 @@ function parseAttachment(content: string) {
   return null;
 }
 
+function S3Image({ src, alt }: { src: string; alt: string }) {
+  const [resolved, setResolved] = useState<string>("");
+  useEffect(() => {
+    if (isS3Ref(src)) {
+      resolveS3Url(getS3Key(src)).then(setResolved);
+    } else {
+      setResolved(src);
+    }
+  }, [src]);
+
+  const handleClick = async () => {
+    if (isS3Ref(src)) {
+      const url = await resolveS3Url(getS3Key(src));
+      if (url) window.open(url, "_blank");
+    } else {
+      window.open(src, "_blank");
+    }
+  };
+
+  if (!resolved) return <div className="h-20 w-40 bg-neutral-100 rounded-lg animate-pulse mt-1" />;
+  return (
+    <div className="mt-1 cursor-pointer" onClick={handleClick}>
+      <img src={resolved} alt={alt} className="max-w-sm max-h-[300px] rounded-lg border border-neutral-200 hover:border-neutral-300 transition-colors" />
+      <p className="text-[11px] text-neutral-400 mt-1">{alt} · Click to open</p>
+    </div>
+  );
+}
+
 function MessageContent({ content }: { content: string }) {
   const attach = parseAttachment(content);
   if (attach) {
     if (attach.isImage && attach.fileUrl) {
-      return (
-        <div className="mt-1">
-          <img src={attach.fileUrl} alt={attach.fileName} className="max-w-sm max-h-[300px] rounded-lg border border-neutral-200" />
-          <p className="text-[11px] text-neutral-400 mt-1">{attach.fileName}</p>
-        </div>
-      );
+      return <S3Image src={attach.fileUrl} alt={attach.fileName!} />;
     }
     if (attach.textContent) {
       return (
@@ -333,7 +397,9 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
         if (res.ok) {
           const data = await res.json();
           const isImage = pendingFile.type.startsWith("image/");
-          onSendMessage(isImage ? `![${pendingFile.name}](${data.url})` : `📎 [${pendingFile.name}](${data.url})`);
+          // Store S3 key (not presigned URL) so links don't expire
+          const s3Ref = `s3://${data.key}`;
+          onSendMessage(isImage ? `![${pendingFile.name}](${s3Ref})` : `📎 [${pendingFile.name}](${s3Ref})`);
           setPendingFile(null);
           return;
         }
