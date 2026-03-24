@@ -265,21 +265,35 @@ function ReactionBar({ reactions, currentUserId, onToggle }: { reactions: Record
   );
 }
 
-function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void; onClose: () => void }) {
+function EmojiPicker({ onSelect, onClose, triggerRef }: { onSelect: (emoji: string) => void; onClose: () => void; triggerRef?: React.RefObject<HTMLButtonElement | null> }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (triggerRef?.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPos({ top: rect.top - 48, left: Math.max(8, rect.left - 140) });
+    }
+  }, [triggerRef]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
+
   return (
-    <div ref={ref} className="absolute bottom-full mb-2 right-0 bg-white rounded-xl border border-neutral-200 shadow-xl shadow-neutral-200/50 p-2 z-50">
+    <div
+      ref={ref}
+      className="fixed bg-white rounded-xl border border-neutral-200 shadow-xl shadow-neutral-200/50 p-2 z-[100]"
+      style={pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0, visibility: "hidden" as const }}
+    >
       <div className="flex items-center gap-1">
         {QUICK_EMOJIS.map((emoji) => (
           <button
             key={emoji}
-            onClick={() => { onSelect(emoji); onClose(); }}
-            className="h-8 w-8 rounded-md flex items-center justify-center text-[18px] leading-none hover:bg-neutral-100 hover:scale-110 active:scale-95 transition-all duration-100"
+            onClick={(e) => { e.stopPropagation(); onSelect(emoji); onClose(); }}
+            className="h-8 w-8 rounded-md flex items-center justify-center text-[18px] leading-none hover:bg-neutral-100 transition-colors"
           >
             {emoji}
           </button>
@@ -294,6 +308,7 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [emojiPickerMsgId, setEmojiPickerMsgId] = useState<string | null>(null);
+  const emojiTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [pendingFile, setPendingFile] = useState<{ name: string; size: number; type: string; content?: string; isText: boolean; previewUrl?: string; rawFile?: File } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -464,9 +479,14 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
   const renderActions = (msg: Message, isOwn: boolean) => (
     <div className={`absolute -top-3 right-5 items-center rounded-lg bg-white border border-neutral-200 shadow-sm px-0.5 py-0.5 z-10 ${emojiPickerMsgId === msg.id ? "flex" : "hidden group-hover:flex"}`}>
       {onToggleReaction && msg.sort_key && (
-        <div className="relative">
+        <>
           <button
-            onClick={() => setEmojiPickerMsgId(emojiPickerMsgId === msg.id ? null : msg.id)}
+            data-emoji-trigger={msg.id}
+            onClick={(e) => {
+              const btn = e.currentTarget;
+              emojiTriggerRef.current = btn;
+              setEmojiPickerMsgId(emojiPickerMsgId === msg.id ? null : msg.id);
+            }}
             className={`${actionBtn} text-neutral-400 hover:text-amber-600 hover:bg-amber-50`}
             title="Add reaction"
           >
@@ -474,11 +494,12 @@ export function ChatArea({ roomName, roomDescription, messages, onSendMessage, o
           </button>
           {emojiPickerMsgId === msg.id && (
             <EmojiPicker
+              triggerRef={emojiTriggerRef}
               onSelect={(emoji) => onToggleReaction(msg.id, msg.sort_key!, emoji)}
               onClose={() => setEmojiPickerMsgId(null)}
             />
           )}
-        </div>
+        </>
       )}
       {onReply && (
         <button
