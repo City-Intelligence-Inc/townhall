@@ -9,14 +9,14 @@
   --font-serif: var(--font-serif), "Newsreader", "Georgia", serif;
 }
 
-/* Font chooser overrides — use font-family directly since @theme vars can't be overridden */
-[data-font="inter"]          { font-family: var(--font-inter), "Inter", -apple-system, system-ui, sans-serif !important; }
-[data-font="dm-sans"]        { font-family: var(--font-dm-sans), "DM Sans", -apple-system, system-ui, sans-serif !important; }
-[data-font="plus-jakarta"]   { font-family: var(--font-plus-jakarta), "Plus Jakarta Sans", -apple-system, system-ui, sans-serif !important; }
-[data-font="space-grotesk"]  { font-family: var(--font-space-grotesk), "Space Grotesk", -apple-system, system-ui, sans-serif !important; }
-[data-font="jetbrains"]      { font-family: var(--font-jetbrains), "JetBrains Mono", monospace !important; }
-[data-font="outfit"]         { font-family: var(--font-outfit), "Outfit", -apple-system, system-ui, sans-serif !important; }
-[data-font="lora"]           { font-family: var(--font-lora), "Lora", "Georgia", serif !important; }
+/* Font chooser overrides — wildcard to beat Tailwind's font-sans on body */
+[data-font="inter"] *,          [data-font="inter"]          { font-family: var(--font-inter), "Inter", -apple-system, system-ui, sans-serif !important; }
+[data-font="dm-sans"] *,        [data-font="dm-sans"]        { font-family: var(--font-dm-sans), "DM Sans", -apple-system, system-ui, sans-serif !important; }
+[data-font="plus-jakarta"] *,   [data-font="plus-jakarta"]   { font-family: var(--font-plus-jakarta), "Plus Jakarta Sans", -apple-system, system-ui, sans-serif !important; }
+[data-font="space-grotesk"] *,  [data-font="space-grotesk"]  { font-family: var(--font-space-grotesk), "Space Grotesk", -apple-system, system-ui, sans-serif !important; }
+[data-font="jetbrains"] *,      [data-font="jetbrains"]      { font-family: var(--font-jetbrains), "JetBrains Mono", monospace !important; }
+[data-font="outfit"] *,         [data-font="outfit"]         { font-family: var(--font-outfit), "Outfit", -apple-system, system-ui, sans-serif !important; }
+[data-font="lora"] *,           [data-font="lora"]           { font-family: var(--font-lora), "Lora", "Georgia", serif !important; }
 
 @theme inline {
   --color-background: var(--background);
