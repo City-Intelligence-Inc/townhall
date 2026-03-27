@@ -12,14 +12,14 @@ interface OnboardingProps {
 const steps = [
   {
     icon: Sparkles,
-    title: "Welcome to Townhall",
+    title: "Welcome to Terminus",
     description: "Your team's real-time messaging hub. Let us show you around — it only takes a moment.",
     visual: (
       <div className="flex items-center justify-center gap-3 py-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-900">
           <MessageSquare className="h-5 w-5 text-white" />
         </div>
-        <span className="text-lg font-semibold text-neutral-900 tracking-tight">Townhall</span>
+        <span className="text-lg font-semibold text-neutral-900 tracking-tight">Terminus</span>
       </div>
     ),
   },

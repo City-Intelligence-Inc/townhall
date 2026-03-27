@@ -43,7 +43,7 @@ export function Sidebar({ rooms, activeRoomId, onSelectRoom, onCreateRoom, onOpe
     <div className="flex flex-col w-[260px] bg-neutral-50 border-r border-neutral-200 h-full select-none">
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-12 border-b border-neutral-200">
-        <h2 className="text-[15px] font-semibold text-neutral-900 tracking-tight">Townhall</h2>
+        <h2 className="text-[15px] font-semibold text-neutral-900 tracking-tight">Terminus</h2>
         <button
           title="Search messages (Cmd+K)"
           onClick={onOpenSearch}

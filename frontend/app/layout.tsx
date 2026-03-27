@@ -46,7 +46,7 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "Townhall — Real-time Chat",
+  title: "Terminus — Real-time Chat",
   description: "Real-time chat room application with channels, reactions, and presence",
 };
 

@@ -14,7 +14,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="border-b border-neutral-200 bg-white sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <span className="text-sm font-semibold tracking-tight">Townhall</span>
+          <span className="text-sm font-semibold tracking-tight">Terminus</span>
           <div className="flex items-center gap-3">
             {isSignedIn ? (
               <Link href="/chat" className="text-sm font-medium hover:underline underline-offset-4 py-3">Open chat</Link>
@@ -59,7 +59,7 @@ export default function LandingPage() {
                   <div className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
                   <div className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
                 </div>
-                <div className="ml-4 bg-white border border-neutral-200 rounded px-3 py-0.5 text-xs text-neutral-400 flex-1 max-w-sm hidden sm:block">townhall.vercel.app/chat</div>
+                <div className="ml-4 bg-white border border-neutral-200 rounded px-3 py-0.5 text-xs text-neutral-400 flex-1 max-w-sm hidden sm:block">terminus.vercel.app/chat</div>
               </div>
               {/* App content mock */}
               <div className="bg-white flex h-[320px] sm:h-[380px]">
@@ -69,7 +69,7 @@ export default function LandingPage() {
                     <div className="h-5 w-5 rounded bg-neutral-900 flex items-center justify-center">
                       <MessageSquare className="h-2.5 w-2.5 text-white" />
                     </div>
-                    <span className="text-[12px] font-semibold text-neutral-700">Townhall</span>
+                    <span className="text-[12px] font-semibold text-neutral-700">Terminus</span>
                   </div>
                   <p className="text-[9px] font-medium text-neutral-400 uppercase tracking-wider mb-1.5 px-1">Channels</p>
                   <div className="space-y-0.5">
@@ -215,7 +215,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-neutral-200">
         <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-          <span className="text-xs text-neutral-400">Townhall</span>
+          <span className="text-xs text-neutral-400">Terminus</span>
           <span className="text-xs text-neutral-400">&copy; {new Date().getFullYear()}</span>
         </div>
       </footer>
